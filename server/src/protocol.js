@@ -1,13 +1,16 @@
-// Cowpanion wire protocol v1 — see docs/cowpanion-protocol.md.
+// Cowpanion wire protocol v2 (v1 hellos still accepted) — see docs/cowpanion-protocol.md.
 // This is the ONLY module that knows message shapes. Everything downstream
 // works with the trusted objects produced here.
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+export const SUPPORTED_VERSIONS = [1, 2];
 export const MAX_FRAME_BYTES = 4096;
 export const MAX_MEMBERS = 24;
 export const VISIBLE_CAP = 12;
 export const CHAT_MAX_GRAPHEMES = 140;
 export const NAME_MAX_GRAPHEMES = 16;
+export const EMOTES = ['moo', 'jump', 'spin'];
+export const REACTION_MAX_GRAPHEMES = 3;
 export const DEFAULT_VARIANT = 'brown';
 export const DEFAULT_NAME = 'cow';
 
@@ -27,6 +30,10 @@ const FORMAT_RE = /[\u202A-\u202E\u2066-\u2069\u{E0000}-\u{E007F}]/gu;
 // ZWJ (U+200D) is kept only when it glues two pictographs together, so family
 // and profession emoji survive while stray joiners are removed.
 const STRAY_ZWJ_RE = /(?<![\p{Extended_Pictographic}\uFE0F\u{1F3FB}-\u{1F3FF}])\u200D|\u200D(?!\p{Extended_Pictographic})/gu;
+
+// A reaction grapheme must contain at least one emoji-ish code point (pictograph,
+// regional indicator for flags, emoji-presentation symbol, or the keycap enclosure).
+const EMOJI_CLUSTER_RE = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\p{Emoji_Presentation}|\u20E3/u;
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
@@ -51,7 +58,7 @@ export function parseFrame(data, isBinary) {
 // Validate a hello. Returns { ok: true, hello } or { ok: false, error, message }
 // where error is a protocol error code (version | malformed | pasture_invalid).
 export function validateHello(msg) {
-  if (msg.protocolVersion !== PROTOCOL_VERSION) {
+  if (!SUPPORTED_VERSIONS.includes(msg.protocolVersion)) {
     return { ok: false, error: 'version', message: 'protocol version mismatch' };
   }
   if (typeof msg.clientId !== 'string' || !CLIENT_ID_RE.test(msg.clientId)) {
@@ -66,6 +73,7 @@ export function validateHello(msg) {
   return {
     ok: true,
     hello: {
+      protocolVersion: msg.protocolVersion,
       clientId: msg.clientId.toLowerCase(),
       pasture,
       displayName: sanitiseName(msg.displayName),
@@ -102,6 +110,22 @@ export function normaliseChat(input) {
   return truncateGraphemes(normaliseText(input), CHAT_MAX_GRAPHEMES);
 }
 
+// Reactions: 1-3 grapheme clusters, every one of them emoji-like, else ''. Whitespace
+// between emoji is dropped; more than 3 emoji are truncated to 3 (as chat is, not rejected).
+export function normaliseReaction(input) {
+  const text = normaliseText(input).replace(/\s+/gu, '');
+  if (text === '') return '';
+  const clusters = [...segmenter.segment(text)].map((c) => c.segment);
+  if (!clusters.every((c) => EMOJI_CLUSTER_RE.test(c))) return '';
+  return clusters.slice(0, REACTION_MAX_GRAPHEMES).join('');
+}
+
+// Trusted { text, emote, reaction } from an inbound chat; each '' when absent/invalid.
+export function validateChatPayload(msg) {
+  const emote = EMOTES.includes(msg.emote) ? msg.emote : '';
+  return { text: normaliseChat(msg.text), emote, reaction: normaliseReaction(msg.reaction) };
+}
+
 export function sanitiseName(input) {
   const name = truncateGraphemes(normaliseText(input), NAME_MAX_GRAPHEMES);
   return name === '' ? DEFAULT_NAME : name;
@@ -109,9 +133,10 @@ export function sanitiseName(input) {
 
 // --- outbound ----------------------------------------------------------------
 
-export function encodeWelcome(yourId, pasture, serverTime) {
+// protocolVersion echoes the version the client sent in its hello.
+export function encodeWelcome(yourId, pasture, serverTime, protocolVersion = PROTOCOL_VERSION) {
   return JSON.stringify({
-    t: 'welcome', protocolVersion: PROTOCOL_VERSION, yourId, pasture,
+    t: 'welcome', protocolVersion, yourId, pasture,
     visibleCap: VISIBLE_CAP, serverTime,
   });
 }
@@ -125,8 +150,15 @@ export function encodePresence(members, overflow) {
   });
 }
 
-export function encodeChat(fromId, name, text, ts) {
-  return JSON.stringify({ t: 'chat', fromId, name, text, ts });
+// v2 recipients get only the non-empty fields; v1 recipients get the v1 shape
+// when there is text, and null (send nothing) for emote/reaction-only frames.
+export function encodeChat(fromId, name, ts, { text, emote, reaction }, recipientVersion = PROTOCOL_VERSION) {
+  if (recipientVersion === 1) return text ? JSON.stringify({ t: 'chat', fromId, name, text, ts }) : null;
+  const frame = { t: 'chat', fromId, name, ts };
+  if (text) frame.text = text;
+  if (emote) frame.emote = emote;
+  if (reaction) frame.reaction = reaction;
+  return JSON.stringify(frame);
 }
 
 export function encodeError(code, message) {

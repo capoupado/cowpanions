@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   normaliseChat, normaliseText, sanitiseName, validateHello, parseFrame, truncateGraphemes,
+  normaliseReaction, validateChatPayload, encodeChat, encodeWelcome, EMOTES,
 } from '../src/protocol.js';
 import { truncateIp } from '../src/log.js';
 import { TokenBucket, ChatLimiter } from '../src/ratelimit.js';
@@ -70,9 +71,12 @@ test('S1: hello validation (version, clientId, pasture, variant)', () => {
   const base = { t: 'hello', protocolVersion: 1, clientId: 'A'.repeat(32), pasture: 'Commons', displayName: 'x', variant: 'white0' };
   const ok = validateHello(base);
   assert.equal(ok.ok, true);
-  assert.deepEqual(ok.hello, { clientId: 'a'.repeat(32), pasture: 'commons', displayName: 'x', variant: 'white0' });
-  assert.equal(validateHello({ ...base, protocolVersion: 2 }).error, 'version');
+  assert.deepEqual(ok.hello, { protocolVersion: 1, clientId: 'a'.repeat(32), pasture: 'commons', displayName: 'x', variant: 'white0' });
+  assert.equal(validateHello({ ...base, protocolVersion: 2 }).hello.protocolVersion, 2);
+  assert.equal(validateHello({ ...base, protocolVersion: 3 }).error, 'version');
+  assert.equal(validateHello({ ...base, protocolVersion: 0 }).error, 'version');
   assert.equal(validateHello({ ...base, protocolVersion: '1' }).error, 'version');
+  assert.equal(validateHello({ ...base, protocolVersion: undefined }).error, 'version');
   assert.equal(validateHello({ ...base, clientId: 'zz' }).error, 'malformed');
   assert.equal(validateHello({ ...base, clientId: 12 }).error, 'malformed');
   assert.equal(validateHello({ ...base, pasture: 'has space' }).error, 'pasture_invalid');
@@ -122,6 +126,49 @@ test('S2: token bucket capacity 3, refill 1 per 3s; abuse after 20 drops in 60s'
   assert.deepEqual(verdicts.slice(0, 3), ['ok', 'ok', 'ok']);
   assert.equal(verdicts.filter((v) => v === 'drop').length, 19);
   assert.equal(verdicts[22], 'abuse');
+});
+
+test('V2: reaction must be 1-3 emoji graphemes; >3 truncated to 3; anything non-emoji rejected', () => {
+  const heart = '\u2764\uFE0F';
+  assert.equal(normaliseReaction(heart), heart);
+  assert.equal(normaliseReaction(heart.repeat(4)), heart.repeat(3), 'truncated to 3, not rejected');
+  assert.equal(normaliseReaction('\u{1F44D}\u{1F3FD}'), '\u{1F44D}\u{1F3FD}', 'skin-tone thumbs up is one cluster');
+  assert.equal(normaliseReaction('\u{1F1F5}\u{1F1F9}'), '\u{1F1F5}\u{1F1F9}', 'flag is one cluster');
+  assert.equal(normaliseReaction('1\uFE0F\u20E3'), '1\uFE0F\u20E3', 'keycap passes');
+  assert.equal(normaliseReaction('\u{1F602} \u{1F389}'), '\u{1F602}\u{1F389}', 'spaces between emoji dropped');
+  assert.equal(normaliseReaction(' ' + heart + '\u200B'), heart, 'normaliseText runs first');
+  assert.equal(normaliseReaction('hi'), '');
+  assert.equal(normaliseReaction(heart + 'x'), '', 'mixed emoji + letter rejected');
+  assert.equal(normaliseReaction('1'), '');
+  assert.equal(normaliseReaction('#'), '');
+  assert.equal(normaliseReaction(''), '');
+  assert.equal(normaliseReaction(undefined), '');
+  assert.equal(normaliseReaction(['\u{1F602}']), '');
+});
+
+test('V2: chat payload validation: emote allow-list, text normalised, reaction filtered', () => {
+  assert.deepEqual(EMOTES, ['moo', 'jump', 'spin']);
+  assert.deepEqual(validateChatPayload({ t: 'chat', text: '  hi  ', emote: 'jump', reaction: '\u2764\uFE0F' }),
+    { text: 'hi', emote: 'jump', reaction: '\u2764\uFE0F' });
+  assert.deepEqual(validateChatPayload({ t: 'chat', emote: 'dance' }), { text: '', emote: '', reaction: '' });
+  assert.deepEqual(validateChatPayload({ t: 'chat', emote: 'MOO' }), { text: '', emote: '', reaction: '' });
+  assert.deepEqual(validateChatPayload({ t: 'chat', emote: ['moo'] }), { text: '', emote: '', reaction: '' });
+  assert.deepEqual(validateChatPayload({ t: 'chat', reaction: 'hi' }), { text: '', emote: '', reaction: '' });
+  assert.deepEqual(validateChatPayload({ t: 'chat' }), { text: '', emote: '', reaction: '' });
+  for (const e of EMOTES) assert.equal(validateChatPayload({ t: 'chat', emote: e }).emote, e);
+});
+
+test('V2: encodeChat per recipient version; encodeWelcome echoes the client version', () => {
+  const heart = '\u2764\uFE0F';
+  const both = { text: 'hi', emote: '', reaction: heart };
+  assert.deepEqual(JSON.parse(encodeChat('a', 'Ann', 5, both, 2)), { t: 'chat', fromId: 'a', name: 'Ann', ts: 5, text: 'hi', reaction: heart });
+  assert.deepEqual(JSON.parse(encodeChat('a', 'Ann', 5, both, 1)), { t: 'chat', fromId: 'a', name: 'Ann', text: 'hi', ts: 5 });
+  const emoteOnly = { text: '', emote: 'jump', reaction: '' };
+  assert.deepEqual(JSON.parse(encodeChat('a', 'Ann', 5, emoteOnly, 2)), { t: 'chat', fromId: 'a', name: 'Ann', ts: 5, emote: 'jump' });
+  assert.equal(encodeChat('a', 'Ann', 5, emoteOnly, 1), null, 'v1 never receives an emote-only frame');
+  assert.equal(encodeChat('a', 'Ann', 5, { text: '', emote: '', reaction: heart }, 1), null);
+  assert.equal(JSON.parse(encodeWelcome('a', 'commons', 1, 1)).protocolVersion, 1);
+  assert.equal(JSON.parse(encodeWelcome('a', 'commons', 1, 2)).protocolVersion, 2);
 });
 
 test('normaliseText collapses all whitespace kinds to a single space', () => {

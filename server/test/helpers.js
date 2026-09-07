@@ -69,8 +69,15 @@ export function waitFor(ws, pred, timeoutMs = 3_000) {
 
 export const sendJson = (ws, obj) => ws.send(JSON.stringify(obj));
 
+// Clients speak the current protocol unless fields.protocolVersion says otherwise
+// (pass protocolVersion: 1 to act as a legacy client).
+export const DEFAULT_PROTOCOL_VERSION = 2;
+
 export async function hello(ws, fields = {}) {
-  sendJson(ws, { t: 'hello', protocolVersion: 1, clientId: cid(1), pasture: 'commons', displayName: 'cow', variant: 'brown', ...fields });
+  sendJson(ws, {
+    t: 'hello', protocolVersion: DEFAULT_PROTOCOL_VERSION, clientId: cid(1), pasture: 'commons',
+    displayName: 'cow', variant: 'brown', ...fields,
+  });
   return waitFor(ws, (m) => m.t === 'welcome');
 }
 

@@ -11,9 +11,15 @@ namespace Cowpanion.App.Overlay;
 /// <summary>
 /// Draws the herd onto a Canvas by writing transforms directly. One <see cref="CowVisual"/> per cow, created on
 /// spawn and removed on despawn; the per-tick path allocates nothing and touches only what changed.
+/// Lanes: a cow's <see cref="Cow.Position"/>.Y is a depth offset — the cow is drawn that many DIPs higher and behind
+/// front-lane cows (z-index). Emotes are procedural: Jump adds a vertical hop, Spin flips the facing rapidly.
 /// </summary>
 internal sealed class HerdRenderer
 {
+    private const double JumpHeightDips = 22;
+    private const double SpinFlipSeconds = 0.125;
+    private const int BaseZ = 100;
+
     private sealed class CowVisual
     {
         public required Cow Cow;
@@ -28,6 +34,7 @@ internal sealed class HerdRenderer
         public int LastIdleVariant = -1;
         public string? LastVariant;
         public int LastFrame = -1;
+        public int LastZ = int.MinValue;
         public int Stamp;
     }
 
@@ -96,25 +103,31 @@ internal sealed class HerdRenderer
         }
     }
 
-    /// <summary>Screen-space (strip DIP) rectangle of a cow's sprite, for chat input placement and hit testing.</summary>
+    /// <summary>
+    /// Screen-space (strip DIP) rectangle of a cow's sprite, for bubbles, chat input placement and hit testing.
+    /// Follows the lane depth (so everything attached to the cow moves with it) but not the Jump hop.
+    /// </summary>
     public Rect CowRect(Cow cow)
     {
         double w = CowWidthDips;
         double h = CowHeightDips;
-        return new Rect(cow.Position.X - w / 2, _groundY - h, w, h);
+        return new Rect(cow.Position.X - w / 2, _groundY - h - Math.Round(cow.Position.Y), w, h);
     }
 
+    /// <summary>The cow under <paramref name="p"/>; when rects overlap the front-most (lowest depth) cow wins.</summary>
     public Cow? HitTest(Point p, HerdSimulator sim)
     {
         var cows = sim.Cows;
+        Cow? best = null;
         for (int i = 0; i < cows.Count; i++)
         {
-            if (CowRect(cows[i]).Contains(p))
+            var cow = cows[i];
+            if (CowRect(cow).Contains(p) && (best is null || cow.Position.Y < best.Position.Y))
             {
-                return cows[i];
+                best = cow;
             }
         }
-        return null;
+        return best;
     }
 
     public void Clear()
@@ -211,8 +224,12 @@ internal sealed class HerdRenderer
             v.LastFrame = frame;
         }
 
-        // Art faces left. Facing +1 means flipped.
+        // Art faces left. Facing +1 means flipped. Spin: flip the rendered facing every 125 ms without a Turn.
         bool flipped = _sprites.Manifest.ArtFacesLeft ? cow.Facing > 0 : cow.Facing < 0;
+        if (cow.Emote == CowEmote.Spin && ((int)Math.Floor(cow.EmoteElapsed / SpinFlipSeconds) & 1) == 1)
+        {
+            flipped = !flipped;
+        }
         double sx = flipped ? -1 : 1;
         if (v.Flip.ScaleX != sx)
         {
@@ -221,8 +238,16 @@ internal sealed class HerdRenderer
 
         double w = CowWidthDips;
         double h = CowHeightDips;
+        double depth = Math.Round(cow.Position.Y);
         double x = Math.Round(cow.Position.X - w / 2);
-        double y = Math.Round(_groundY - h);
+        double y = _groundY - h - depth;
+        if (cow.Emote == CowEmote.Jump)
+        {
+            // Two hops over the emote: |sin| completes two arches per period.
+            double hop = JumpHeightDips * Math.Abs(Math.Sin(2 * Math.PI * cow.EmoteElapsed / EmoteTiming.JumpSeconds));
+            y -= Math.Round(hop);
+        }
+        y = Math.Round(y);
         if (v.Move.X != x)
         {
             v.Move.X = x;
@@ -230,6 +255,15 @@ internal sealed class HerdRenderer
         if (v.Move.Y != y)
         {
             v.Move.Y = y;
+        }
+
+        // Back-lane cows (larger depth) draw behind front-lane cows.
+        int z = BaseZ - (int)depth;
+        if (z != v.LastZ)
+        {
+            Panel.SetZIndex(v.Image, z);
+            Panel.SetZIndex(v.SelfMarker, z);
+            v.LastZ = z;
         }
 
         var markerVisibility = cow.IsSelf ? Visibility.Visible : Visibility.Collapsed;

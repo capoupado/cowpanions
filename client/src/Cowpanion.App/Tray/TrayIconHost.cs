@@ -14,6 +14,7 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _status = new("Starting…") { Enabled = false };
     private readonly WinForms.ToolStripMenuItem _multiplayer = new("Multiplayer") { CheckOnClick = false };
     private readonly WinForms.ToolStripMenuItem _mute = new("Mute bubbles (Ctrl+Alt+M)");
+    private readonly WinForms.ToolStripMenuItem _heart = new("Send a heart (Ctrl+Alt+H)");
     private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
     private readonly WinForms.ToolStripMenuItem _colour = new("Cow colour");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
@@ -29,6 +30,7 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
         _menu.Items.Add(_multiplayer);
         _menu.Items.Add(_mute);
+        _menu.Items.Add(_heart);
         _menu.Items.Add(_colour);
         _menu.Items.Add(_fillerPlus);
         _menu.Items.Add(_fillerMinus);
@@ -51,6 +53,7 @@ internal sealed class TrayIconHost : IDisposable
 
         _multiplayer.Click += (_, _) => MultiplayerToggled?.Invoke();
         _mute.Click += (_, _) => MuteToggled?.Invoke();
+        _heart.Click += (_, _) => HeartRequested?.Invoke();
         _startup.Click += (_, _) => StartupToggled?.Invoke();
         _fillerPlus.Click += (_, _) => FillerDelta?.Invoke(+1);
         _fillerMinus.Click += (_, _) => FillerDelta?.Invoke(-1);
@@ -73,6 +76,7 @@ internal sealed class TrayIconHost : IDisposable
     public event Action<int>? FillerDelta;
     public event Action<string>? VariantSelected;
     public event Action? MuteToggled;
+    public event Action? HeartRequested;
     public event Action? MultiplayerToggled;
     public event Action? StartupToggled;
 

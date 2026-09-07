@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Cowpanion.App.Interop;
 using Cowpanion.Core.Simulation;
+using Cowpanion.Net;
 
 namespace Cowpanion.App.Overlay;
 
@@ -20,13 +21,13 @@ internal sealed class ChatInputHost
     private readonly OverlayWindow _window;
     private readonly HerdRenderer _herd;
     private readonly Func<HerdSimulator> _sim;
-    private readonly Func<string, Task<bool>> _send;
+    private readonly Func<string, string, string, Task<bool>> _send;
     private readonly Action<string> _log;
     private double _idle;
     private bool _armed;
     private bool _injectExceptionOnce;
 
-    public ChatInputHost(OverlayWindow window, HerdRenderer herd, Func<HerdSimulator> sim, Func<string, Task<bool>> send, Action<string> log)
+    public ChatInputHost(OverlayWindow window, HerdRenderer herd, Func<HerdSimulator> sim, Func<string, string, string, Task<bool>> send, Action<string> log)
     {
         _window = window;
         _herd = herd;
@@ -182,21 +183,23 @@ internal sealed class ChatInputHost
         else if (e.Key == Key.Enter)
         {
             e.Handled = true;
-            string text = _window.ChatBox.Text.Trim();
+            string text = _window.ChatBox.Text;
             Disarm("enter");
-            if (text.Length > 0)
+            // /moo /jump /spin → emote; /heart etc. and emoji-only lines → reaction; anything else → text.
+            var draft = ChatComposer.Parse(text);
+            if (!draft.IsEmpty)
             {
-                // Own bubble arrives via the server echo; nothing is rendered optimistically.
-                _ = SendSafelyAsync(text);
+                // Own bubble/emote/reaction arrives via the server echo; nothing is rendered optimistically.
+                _ = SendSafelyAsync(draft);
             }
         }
     }
 
-    private async Task SendSafelyAsync(string text)
+    private async Task SendSafelyAsync(ChatDraft draft)
     {
         try
         {
-            bool sent = await _send(text);
+            bool sent = await _send(draft.Text, draft.Emote, draft.Reaction);
             if (!sent)
             {
                 _log("chat not sent: not connected");

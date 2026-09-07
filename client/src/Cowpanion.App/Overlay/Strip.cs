@@ -6,13 +6,15 @@ namespace Cowpanion.App.Overlay;
 /// <summary>Everything that belongs to one monitor: window, simulator, renderers, chat host.</summary>
 internal sealed class Strip
 {
-    public Strip(MonitorInfo monitor, OverlayWindow window, HerdSimulator simulator, HerdRenderer herd, BubbleRenderer bubbles, ChatInputHost chat)
+    public Strip(MonitorInfo monitor, OverlayWindow window, HerdSimulator simulator, HerdRenderer herd, BubbleRenderer bubbles, HoverLabelRenderer hoverLabel, ReactionRenderer reactions, ChatInputHost chat)
     {
         Monitor = monitor;
         Window = window;
         Simulator = simulator;
         Herd = herd;
         Bubbles = bubbles;
+        HoverLabel = hoverLabel;
+        Reactions = reactions;
         Chat = chat;
     }
 
@@ -21,6 +23,8 @@ internal sealed class Strip
     public HerdSimulator Simulator { get; }
     public HerdRenderer Herd { get; }
     public BubbleRenderer Bubbles { get; }
+    public HoverLabelRenderer HoverLabel { get; }
+    public ReactionRenderer Reactions { get; }
     public ChatInputHost Chat { get; }
 
     /// <summary>Converts a physical-pixel screen point to strip DIPs; false when the point is not over this strip's monitor.</summary>

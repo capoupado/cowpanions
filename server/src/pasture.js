@@ -1,10 +1,10 @@
 // A pasture is a named room: a member map keyed by clientId, plus broadcast.
-import { VISIBLE_CAP, encodePresence } from './protocol.js';
+import { VISIBLE_CAP, SUPPORTED_VERSIONS, encodePresence, encodeChat } from './protocol.js';
 
 export class Pasture {
   constructor(code) {
     this.code = code;
-    this.members = new Map(); // clientId -> { id, name, variant, send }
+    this.members = new Map(); // clientId -> { id, name, variant, protocolVersion, send }
   }
 
   get size() { return this.members.size; }
@@ -13,6 +13,15 @@ export class Pasture {
 
   broadcast(frame) {
     for (const m of this.members.values()) m.send(frame);
+  }
+
+  // Encode once per protocol version; a null encoding means "nothing for that version".
+  broadcastChat(fromId, name, ts, payload) {
+    const frames = new Map(SUPPORTED_VERSIONS.map((v) => [v, encodeChat(fromId, name, ts, payload, v)]));
+    for (const m of this.members.values()) {
+      const frame = frames.get(frames.has(m.protocolVersion) ? m.protocolVersion : SUPPORTED_VERSIONS.at(-1));
+      if (frame !== null) m.send(frame);
+    }
   }
 
   // Full list, recipient always included, at most VISIBLE_CAP entries.

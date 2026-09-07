@@ -9,8 +9,8 @@ import { Registry } from './registry.js';
 import { ChatLimiter } from './ratelimit.js';
 import {
   CLOSE, MAX_FRAME_BYTES, MAX_MEMBERS,
-  parseFrame, validateHello, normaliseChat,
-  encodeWelcome, encodeChat, encodeError, encodePong,
+  parseFrame, validateHello, validateChatPayload,
+  encodeWelcome, encodeError, encodePong,
 } from './protocol.js';
 
 // Production defaults match the protocol timing table exactly. Tests override.
@@ -91,7 +91,7 @@ export function createServer(overrides = {}) {
 
   function onConnection(ws, ip) {
     const conn = {
-      ws, ip, id: null, name: null, variant: null, pasture: null,
+      ws, ip, id: null, name: null, variant: null, pasture: null, protocolVersion: null,
       lastSeen: Date.now(), helloTimer: null,
       limiter: new ChatLimiter({
         capacity: opt.chatCapacity, refillMs: opt.chatRefillMs,
@@ -145,7 +145,7 @@ export function createServer(overrides = {}) {
       log('info', 'hello_rejected', { ip: truncateIp(conn.ip), error: v.error });
       return closeWith(conn, v.error === 'version' ? CLOSE.VERSION : CLOSE.MALFORMED, v.error);
     }
-    const { clientId, pasture: code, displayName, variant } = v.hello;
+    const { clientId, pasture: code, displayName, variant, protocolVersion } = v.hello;
     if (bans.isBanned(clientId)) {
       send(conn, encodeError('banned', 'client is banned'));
       log('info', 'banned_join', { ip: truncateIp(conn.ip), clientId });
@@ -163,10 +163,10 @@ export function createServer(overrides = {}) {
       log('info', 'pasture_full', { pasture: code, clientId });
       return closeWith(conn, CLOSE.FULL, 'pasture full');
     }
-    Object.assign(conn, { id: clientId, name: displayName, variant, pasture });
-    pasture.add({ id: clientId, name: displayName, variant, send: (f) => send(conn, f) });
+    Object.assign(conn, { id: clientId, name: displayName, variant, pasture, protocolVersion });
+    pasture.add({ id: clientId, name: displayName, variant, protocolVersion, send: (f) => send(conn, f) });
     byClientId.set(clientId, conn);
-    send(conn, encodeWelcome(clientId, code, Date.now()));
+    send(conn, encodeWelcome(clientId, code, Date.now(), protocolVersion));
     pasture.broadcastPresence();
     log('info', 'join', { pasture: code, clientId, name: displayName, ip: truncateIp(conn.ip), members: pasture.size });
   }
@@ -179,10 +179,12 @@ export function createServer(overrides = {}) {
       return closeWith(conn, CLOSE.RATE, 'rate limit abuse');
     }
     if (verdict === 'drop') return log('debug', 'chat_dropped', { clientId: conn.id });
-    const text = normaliseChat(msg.text);
-    if (text === '') return;
-    conn.pasture.broadcast(encodeChat(conn.id, conn.name, text, Date.now()));
-    log('info', 'chat', { pasture: conn.pasture.code, fromId: conn.id, bytes: Buffer.byteLength(text) });
+    const payload = validateChatPayload(msg);
+    if (payload.text === '' && payload.emote === '' && payload.reaction === '') return;
+    conn.pasture.broadcastChat(conn.id, conn.name, Date.now(), payload);
+    // Sizes and flags only: never the text or the emoji itself (no chat content in logs).
+    log('info', 'chat', { pasture: conn.pasture.code, fromId: conn.id, bytes: Buffer.byteLength(payload.text),
+      emote: payload.emote !== '', reaction: payload.reaction !== '' });
   }
 
   function leavePasture(conn) {

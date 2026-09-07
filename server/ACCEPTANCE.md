@@ -2,7 +2,7 @@
 
 Every criterion from `docs/cowpanion-server-plan.md` S0–S3. Test names refer to
 `server/test/protocol.test.js` and `server/test/server.test.js`; `npm test` on Windows /
-Node 24.16 ran them (30 pass, 1 skipped) on 2026-09-07. Nobody in this session has VPS access,
+Node 24.16 ran them (38 pass, 1 skipped) on 2026-09-07. Nobody in this session has VPS access,
 so anything touching nginx, systemd, DNS, certbot or the public network is `manual: to verify`
 with the command in `deploy/RUNBOOK.md` (section numbers below).
 
@@ -46,6 +46,19 @@ Legend: `automated: pass (test)` · `manual: to verify (RUNBOOK §)` · `not ver
 - [x] `journalctl | grep <phrase>` returns nothing — **automated: pass** on the log sink (`S2: log output never contains chat text`); the journald end of it is **manual: to verify** (RUNBOOK S2.6).
 - [x] Control chars, ZWJ, 200-newline message neutralised — **automated: pass** (`S2: control chars, zero-width chars, bidi controls and 200 newlines are neutralised`; `S2: legitimate ZWJ emoji sequences survive normalisation` guards the other direction).
 
+## V2 — Protocol v2: emotes, reactions, v1 compatibility (2026-09-07)
+
+All automated; `npm test` ran 38 pass, 1 skipped (Windows SIGTERM) after these landed.
+
+- [x] `hello` accepts `protocolVersion` 1 and 2; 3, 0, `"1"`, missing → `error version` + 4000 — **automated: pass** (`S1: hello validation…` unit; `S1: hello rejections…` end-to-end now sends 3).
+- [x] `welcome.protocolVersion` echoes the client's version (1 to v1, 2 to v2), v1 and v2 share a pasture — **automated: pass** (`V2: welcome echoes protocolVersion 1 to a v1 client and 2 to a v2 client`; `V2: encodeChat per recipient version; encodeWelcome echoes the client version`).
+- [x] Reaction rules: `❤️`, `👍🏽`, `🇵🇹`, `1️⃣` pass; `"hi"`, `"❤️x"`, `"1"`, `"#"`, non-strings rejected; 4 hearts truncate to 3; spaces between emoji dropped — **automated: pass** (`V2: reaction must be 1-3 emoji graphemes…`).
+- [x] Emote allow-list `moo` / `jump` / `spin`; `dance`, `MOO`, arrays → absent — **automated: pass** (`V2: chat payload validation…`).
+- [x] Emote-only chat: v2 members get `emote` and no `text`/`reaction` keys; a v1 member in the same pasture receives nothing and stays connected — **automated: pass** (`V2: emote-only chat reaches v2 members with emote and no text; v1 member receives nothing`).
+- [x] `text` + `reaction`: v1 gets exactly `{t, fromId, name, text, ts}`; v2 gets both; reaction-only reaches v2 only — **automated: pass** (`V2: text+reaction reaches v1 as text only (v1 shape) and v2 with both`).
+- [x] Empty/invalid payload (`emote: "dance"`, `reaction: "hi"`, bare `{t:"chat"}`) relayed to nobody, connection survives, still costs a rate-limit token — **automated: pass** (`V2: invalid or empty chat payload…`).
+- [x] Log line for `chat` is `bytes` (text only) + `emote: bool` + `reaction: bool`; neither the text, the emoji (raw or JSON-escaped) nor the emote name appears anywhere in the log — **automated: pass** (`V2: log never contains the reaction emoji or text…`; `S2: log output never contains chat text` still passes).
+
 ## S3 — Hardening
 
 - [x] Banned clientId cannot join; clean id can — **automated: pass** (`S3: banned clientId gets error+4003…`; also: ban applied while connected evicts at next sweep; unban re-admits). Hashing is SHA-256 in `src/bans.js`. CLI exercised by hand against a live server (ban/list/unban/usage error).
@@ -73,3 +86,9 @@ Legend: `automated: pass (test)` · `manual: to verify (RUNBOOK §)` · `not ver
   profession emoji survive. Unicode tag characters (subdivision flags such as England) are stripped.
 - A ban issued while the member is connected is enforced at the next sweep (≤ 10s), not only on
   the next `hello`.
+- v2 reactions with more than 3 emoji are **truncated to 3** rather than rejected, matching how
+  `text` over 140 graphemes is handled. Whitespace between emoji is dropped so `"😂 🎉"` counts
+  as two emoji. The keycap enclosure U+20E3 is accepted alongside the Unicode emoji properties so
+  `1️⃣` counts as an emoji.
+- The chat log line never carries the emote name (only `emote: true`), even though the three
+  allowed names are public — keeps "no chat content in logs" a rule with no exceptions.

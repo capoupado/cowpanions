@@ -28,7 +28,7 @@ public static class TransitionTable
                 weights[(int)CowState.Moo] = 0.05;
                 break;
             case CowState.Idle:
-                weights[(int)CowState.Walk] = 1.2 * (1.3 - lazy);
+                weights[(int)CowState.Walk] = 1.2 * (1.3 - 0.7 * lazy);
                 weights[(int)CowState.Graze] = 0.7 + lazy;
                 weights[(int)CowState.LieDown] = 0.15 + 0.5 * lazy;
                 weights[(int)CowState.Turn] = 0.2;
@@ -37,7 +37,7 @@ public static class TransitionTable
                 break;
             case CowState.Graze:
                 weights[(int)CowState.Idle] = 1.0;
-                weights[(int)CowState.Walk] = 0.9 * (1.3 - lazy);
+                weights[(int)CowState.Walk] = 0.9 * (1.3 - 0.7 * lazy);
                 weights[(int)CowState.Graze] = 0.4 + lazy * 0.6;
                 weights[(int)CowState.LieDown] = 0.1 + 0.3 * lazy;
                 break;
@@ -102,7 +102,7 @@ public static class TransitionTable
         switch (state)
         {
             case CowState.Walk:
-                return 2.0 + u * 7.0;
+                return 4.0 + u * 10.0;
             case CowState.Idle:
                 return 2.0 + u * 5.0 * (0.6 + p.Laziness);
             case CowState.Graze:

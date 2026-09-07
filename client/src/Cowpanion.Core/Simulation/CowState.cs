@@ -21,3 +21,31 @@ public enum CowLifecycle
     /// <summary>Walking towards the nearest edge; removed once fully off-strip.</summary>
     Leaving,
 }
+
+/// <summary>
+/// A short visual flourish. The simulator only times it and holds the cow still; the renderer draws the hop,
+/// the flips or the moo row.
+/// </summary>
+public enum CowEmote
+{
+    None,
+    Moo,
+    Jump,
+    Spin,
+}
+
+/// <summary>Emote durations in seconds, shared by the simulator (timing) and the renderer (animation curves).</summary>
+public static class EmoteTiming
+{
+    public const double MooSeconds = 1.2;
+    public const double JumpSeconds = 1.0;
+    public const double SpinSeconds = 1.0;
+
+    public static double Seconds(CowEmote emote) => emote switch
+    {
+        CowEmote.Moo => MooSeconds,
+        CowEmote.Jump => JumpSeconds,
+        CowEmote.Spin => SpinSeconds,
+        _ => 0,
+    };
+}

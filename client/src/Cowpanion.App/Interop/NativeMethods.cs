@@ -25,6 +25,7 @@ internal static class NativeMethods
     public const uint VK_K = 0x4B;
     public const uint VK_C = 0x43;
     public const uint VK_M = 0x4D;
+    public const uint VK_H = 0x48;
 
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const int MDT_EFFECTIVE_DPI = 0;

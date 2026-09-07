@@ -12,6 +12,10 @@ live server is marked manual.
 
 Final run: `dotnet build -c Release` → 0 warnings, 0 errors. `dotnet test -c Release` → Core 35/35, Net 18/18.
 
+Interaction round (2026-09-07, protocol v2): `dotnet build -c Release -p:BaseOutputPath=bin-publish/` → 0 warnings,
+0 errors. `dotnet test` → Core 50/50, Net 54/54. Publish to `dist/Cowpanion-win-x64` succeeded; a 15 s smoke run of
+the published exe against the (still v1) deployed server logged close 4000 once, ran local-only, no tick errors.
+
 ---
 
 ## Hard rules (every phase)
@@ -90,6 +94,63 @@ Final run: `dotnet build -c Release` → 0 warnings, 0 errors. `dotnet test -c R
 - [ ] 8-hour soak with multiplayer: flat memory, no socket leak — **manual: to verify**. One `ClientWebSocket` per attempt, disposed in a `finally` (`PastureClient.RunAsync`).
 - [ ] `PRIVACY.md` next to the binary — **observed**: present in `bin/Release/.../` and in `publish/`.
 - [ ] Optional moo, muted by default — **observed** by code: `MooPlayer` is a no-op without `assets/audio/moo.wav`; none is shipped (TODO in the file).
+
+## P4 — Interaction quick wins (protocol v2)
+
+Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built against the v2 contract in
+`docs/cowpanion-protocol.md`; the deployed server must be on the v2 build for the network items.
+
+- [ ] **Hover name tag** — resting the cursor on a cow for ~0.4 s shows a small label above it (member name, "cow"
+  for fillers, "(you)" suffix on the own cow); it fades in/out over 120 ms, follows the cow, hides while that cow has a
+  bubble or is leaving. `Overlay/HoverLabelRenderer.cs`; hit test in `Orchestrator.OnTick` → `HerdRenderer.HitTest`
+  (front lane wins when rects overlap) → `HerdSimulator.SetHovered`. Cursor is read via `GetCursorPos`; the label is
+  `IsHitTestVisible=false` and the window stays `WS_EX_TRANSPARENT`. **automated: pass** for the hover timer (Core
+  `HerdSimulatorTests`, hover tests). **manual: to verify** — hover a cow: tag after ~0.4 s, gone when the cursor
+  leaves; click through it onto the desktop while it shows; hover a cow whose bubble is up: no tag.
+- [ ] **Cursor startle** — a fast cursor sweep (> ~1500 DIPs/s) over the strip startles cows within ~150 DIPs into a
+  short spooked walk away; a hovered relaxed cow looks up (idle2 row). **automated: pass** (Core `HerdSimulatorTests`
+  startle/hover tests). **manual: to verify** — flick the mouse across the herd: nearby cows trot off, and the same cow
+  is not startled again for a few seconds.
+- [ ] **Lanes and roaming** — cows pick wander destinations anywhere on the strip; a walker blocked by a stationary
+  cow steps into the back lane (drawn 14 DIPs higher and behind: `HerdRenderer` z-index = 100 − depth), passes, and
+  returns to the front lane. Resting cows are always in the front lane. **automated: pass** (Core lane / wander tests;
+  `Six_cows_never_visually_overlap` now means "never within the same lane"). **manual: to verify** — watch for 5
+  minutes: your own cow visits both halves of the screen; a passing cow is drawn behind and slightly higher, never
+  overlapping a front cow in its own lane; bubbles, the chat input and the hover tag follow the raised cow.
+- [ ] **Emotes** — `/moo`, `/jump`, `/spin` in the chat box (text after the command is sent alongside as a bubble).
+  Moo plays the moo row (and the sound hook when `mooEnabled`); Jump is two 22-DIP hops over 1 s; Spin flips the
+  rendered facing every 125 ms for 1 s. The simulator holds the cow still; `HerdRenderer.Update` draws the flourish.
+  **automated: pass** — parsing: `ChatComposerTests.Slash_emotes_become_emotes_with_trailing_text`; wire:
+  `MessageCodecTests.Chat_v2_writes_only_non_empty_fields`,
+  `PastureClientTests.Emote_is_sent_as_a_chat_frame_without_text`; timing: Core `TriggerEmote` tests.
+  **manual: to verify** — two clients: `/jump` on one, both screens show that cow hop twice; `/spin hello` shows the
+  spin and a "hello" bubble; the own cow only reacts on the server echo (offline nothing happens and the log says
+  "chat not sent: not connected").
+- [ ] **Reactions** — emoji-only input (1–3 emoji, spaces allowed; more are cut to three) and `/heart` `/love` `/lol`
+  `/wave` `/party` `/wow` `/sad` send a `reaction`; receivers spawn 4–6 emoji rising ~90 DIPs from the cow's head over
+  2.2 s with a sine sway, growing 0.8→1.1 and fading in the last 0.6 s (`Overlay/ReactionRenderer.cs`, pooled
+  TextBlocks, global cap 40). No bubble. **automated: pass** — `ChatComposerTests.Emoji_only_input_is_a_reaction`,
+  `Slash_reaction_commands_expand_case_insensitively`, `More_than_three_emoji_are_truncated_to_three`,
+  `Everything_else_is_plain_text`; `MessageCodecTests.Chat_v2_server_frames_decode_with_optional_fields`.
+  **manual: to verify** — type `❤️` and Enter: floating hearts over your cow on every screen; `/party gg` shows both a
+  bubble and 🎉; Ctrl+Alt+M stops reactions and emotes from others as well as bubbles.
+- [ ] **Ctrl+Alt+H hotkey and tray "Send a heart (Ctrl+Alt+H)"** — sends a `❤️` reaction with no arming and no
+  focus change (`Orchestrator.SendHeart`; registered after the kill hotkey). Logs `heart not sent: not connected`
+  offline. **manual: to verify** — while typing in another app press Ctrl+Alt+H: hearts over your cow, focus
+  unchanged, no keystroke lost. Same via the tray item.
+- [ ] **Chat-mode label** — the amber label now reads "Chat mode - Enter sends, Esc cancels, 8 s idle closes.
+  /moo /jump /spin = emote, emoji-only = reaction". **manual: to verify** — Ctrl+Alt+C and read it; still one line on
+  a 1080p-wide strip.
+- [ ] **v2 compatibility** — hello sends `protocolVersion: 2`; a `welcome` with version 1 or 2 is accepted and logged
+  as `welcome: vN …`; v1-shaped `chat` frames (text only) still render as bubbles. **automated: pass** —
+  `PastureClientTests.Hello_is_the_first_frame_and_well_formed` (asserts 2), `Welcome_with_protocol_version_1_is_accepted`,
+  `MessageCodecTests.V1_shaped_chat_frame_still_decodes_with_empty_emote_and_reaction`,
+  `MessageCodecTests.Hello_has_exactly_the_specified_fields`. **observed** — against the deployed v1 server the
+  published client received close 4000 once, logged "terminal close 4000 — not reconnecting" and ran local-only.
+  **manual: to verify** after the server deploy — a friend on the old build still sees your text bubbles and simply
+  does not see emotes or reactions.
+- [ ] **Hard rules unchanged** — no new focus paths (hotkey and tray send without arming), all new visuals live on the
+  non-hit-testable `BubbleCanvas`, no new network calls beyond the existing socket. **observed** by code review.
 
 ---
 

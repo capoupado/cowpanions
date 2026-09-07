@@ -109,6 +109,8 @@ public class HerdSimulatorTests
         for (int i = 0; i < a.Cows.Count; i++)
         {
             Assert.Equal(a.Cows[i].Position.X, b.Cows[i].Position.X);
+            Assert.Equal(a.Cows[i].Position.Y, b.Cows[i].Position.Y);
+            Assert.Equal(a.Cows[i].Lane, b.Cows[i].Lane);
             Assert.Equal(a.Cows[i].State, b.Cows[i].State);
             Assert.Equal(a.Cows[i].Facing, b.Cows[i].Facing);
             Assert.Equal(a.Cows[i].AnimElapsed, b.Cows[i].AnimElapsed);
@@ -278,23 +280,254 @@ public class HerdSimulatorTests
         {
             sim.Tick(Dt);
         }
+        int restingTicks = 0;
+        int restingFrontTicks = 0;
         for (int t = 0; t < 30 * 600; t++)
         {
             sim.Tick(Dt);
             var cows = sim.Cows;
             for (int i = 0; i < cows.Count; i++)
             {
+                if (cows[i].Lifecycle == CowLifecycle.Present && cows[i].State != CowState.Walk)
+                {
+                    restingTicks++;
+                    if (cows[i].Lane == 0)
+                    {
+                        restingFrontTicks++;
+                    }
+                }
                 for (int j = i + 1; j < cows.Count; j++)
                 {
                     if (cows[i].Lifecycle != CowLifecycle.Present || cows[j].Lifecycle != CowLifecycle.Present)
                     {
                         continue;
                     }
+                    if (cows[i].Lane != cows[j].Lane)
+                    {
+                        continue; // the back lane passes behind the front lane by design
+                    }
                     double gap = Math.Abs(cows[i].Position.X - cows[j].Position.X);
-                    Assert.True(gap >= cowWidth - 0.001, $"tick {t}: cows {i} and {j} overlap (gap {gap:F1} < {cowWidth})");
+                    Assert.True(gap >= cowWidth - 0.001, $"tick {t}: cows {i} and {j} overlap in lane {cows[i].Lane} (gap {gap:F1} < {cowWidth})");
                 }
             }
         }
+        Assert.True(restingFrontTicks >= restingTicks * 0.95,
+            $"resting cows were in the front lane only {restingFrontTicks}/{restingTicks} cow-ticks");
+    }
+
+    private static void AssertRoams(HerdSimulator sim, IReadOnlyList<Cow> tracked, double width, int seconds, bool requireReorder)
+    {
+        var minX = tracked.ToDictionary(c => c, c => c.Position.X);
+        var maxX = tracked.ToDictionary(c => c, c => c.Position.X);
+        var order = tracked.OrderBy(c => c.Position.X).ToList();
+        bool reordered = false;
+        for (int t = 0; t < (int)(seconds / Dt); t++)
+        {
+            sim.Tick(Dt);
+            foreach (var c in tracked)
+            {
+                minX[c] = Math.Min(minX[c], c.Position.X);
+                maxX[c] = Math.Max(maxX[c], c.Position.X);
+            }
+            if (!reordered && t % 30 == 0)
+            {
+                var now = tracked.OrderBy(c => c.Position.X).ToList();
+                reordered = !now.SequenceEqual(order);
+            }
+        }
+        foreach (var c in tracked)
+        {
+            double range = maxX[c] - minX[c];
+            Assert.True(range > width * 0.5, $"cow {c} only covered {range:F0} of {width} DIPs ({minX[c]:F0}..{maxX[c]:F0})");
+        }
+        if (requireReorder)
+        {
+            Assert.True(reordered, "the left-to-right ordering of the cows never changed");
+        }
+    }
+
+    [Fact]
+    public void Cows_roam_the_whole_strip()
+    {
+        var sim = NewSim(10, width: 2560, fillers: 5);
+        AssertRoams(sim, sim.Cows.ToList(), 2560, 600, requireReorder: true);
+    }
+
+    [Fact]
+    public void Own_cow_roams_even_with_neighbours()
+    {
+        var sim = new HerdSimulator(31, new HerdSettings());
+        sim.SetBounds(2560);
+        var self = new Member("0123456789abcdef0123456789abcdef", "Me", "brown");
+        sim.SyncMembers(new[] { self }, self.Id, 0);
+        sim.SetFillerCount(4);
+        var me = sim.FindSelf()!;
+        AssertRoams(sim, new[] { me }, 2560, 600, requireReorder: false);
+    }
+
+    [Fact]
+    public void Blocked_walker_passes_via_back_lane_and_returns()
+    {
+        var sim = NewSim(21, width: 1400, fillers: 6);
+        double maxStepY = sim.Settings.LaneChangeDipsPerSecond * Dt + 0.01;
+        var prevY = sim.Cows.ToDictionary(c => c, c => c.Position.Y);
+        var reachedBack = new HashSet<Cow>();
+        bool returned = false;
+        for (int t = 0; t < 30 * 600; t++)
+        {
+            sim.Tick(Dt);
+            foreach (var c in sim.Cows)
+            {
+                if (prevY.TryGetValue(c, out double y))
+                {
+                    Assert.True(Math.Abs(c.Position.Y - y) <= maxStepY, $"tick {t}: cow {c} moved {Math.Abs(c.Position.Y - y):F2} DIPs in depth in one tick");
+                }
+                prevY[c] = c.Position.Y;
+                if (c.Lane == 1)
+                {
+                    reachedBack.Add(c);
+                }
+                else if (reachedBack.Contains(c))
+                {
+                    returned = true;
+                }
+                Assert.InRange(c.Position.Y, -0.001, sim.Settings.LaneDepthDips + 0.001);
+            }
+        }
+        Assert.NotEmpty(reachedBack);
+        Assert.True(returned, "a cow reached the back lane but never came back to the front");
+    }
+
+    [Fact]
+    public void Hovered_cow_looks_up()
+    {
+        var sim = NewSim(12, width: 1600, fillers: 1);
+        var cow = sim.Cows[0];
+        sim.Tick(Dt);
+        for (int t = 0; t < 30 * 120 && cow.State != CowState.Idle && cow.State != CowState.Graze; t++)
+        {
+            sim.Tick(Dt);
+        }
+        Assert.True(cow.State == CowState.Idle || cow.State == CowState.Graze, $"never relaxed: {cow}");
+
+        sim.SetHovered(cow);
+        Assert.True(cow.Hovered);
+        for (int t = 0; t < 30; t++)
+        {
+            sim.Tick(Dt);
+        }
+        Assert.Equal(CowState.Idle, cow.State);
+        Assert.Equal(1, cow.IdleVariant);
+
+        // Holds the pose for as long as the cursor stays.
+        for (int t = 0; t < 30 * 30; t++)
+        {
+            sim.Tick(Dt);
+            Assert.Equal(CowState.Idle, cow.State);
+            Assert.Equal(1, cow.IdleVariant);
+        }
+
+        sim.SetHovered(null);
+        Assert.False(cow.Hovered);
+        Assert.Equal(0, cow.HoverSeconds);
+        bool moved = false;
+        for (int t = 0; t < 30 * 60 && !moved; t++)
+        {
+            sim.Tick(Dt);
+            moved = cow.State != CowState.Idle || cow.IdleVariant != 1;
+        }
+        Assert.True(moved, "cow kept looking up after the cursor left");
+    }
+
+    [Fact]
+    public void Fast_cursor_startles_nearby_cows()
+    {
+        var sim = NewSim(9, width: 2560, fillers: 2);
+        var near = sim.Cows[0];
+        var far = sim.Cows[1];
+        near.Position.X = 600;
+        far.Position.X = 1400;
+        near.State = CowState.Graze;
+        far.State = CowState.Graze;
+        near.StateElapsed = 0;
+        far.StateElapsed = 0;
+        near.StateDuration = 100;
+        far.StateDuration = 100;
+        near.Facing = -1;
+        sim.Tick(Dt);
+
+        // 3000 DIPs/s sweep from well left of the near cow to just short of it.
+        double x = 100;
+        sim.SetCursor(x, true);
+        sim.Tick(Dt);
+        for (int t = 0; t < 4; t++)
+        {
+            x += 3000 * Dt;
+            sim.SetCursor(x, true);
+            sim.Tick(Dt);
+        }
+        Assert.True(x < near.Position.X, "test sweep overshot the cow");
+        Assert.True(near.StartleCooldown > 0, $"near cow was not startled: {near}");
+        sim.SetCursor(x, false);
+
+        bool bolted = false;
+        for (int t = 0; t < 30 && !bolted; t++)
+        {
+            sim.Tick(Dt);
+            bolted = near.State == CowState.Walk && near.WalkBoost > 1.0 && near.Facing == 1;
+        }
+        Assert.True(bolted, $"near cow did not bolt away from the cursor within a second: {near}");
+
+        Assert.Equal(CowState.Graze, far.State);
+        Assert.Equal(1.0, far.WalkBoost);
+        Assert.Equal(0, far.StartleCooldown);
+    }
+
+    [Fact]
+    public void Emote_times_out_and_holds_cow_still()
+    {
+        var sim = NewSim(3, width: 1600, fillers: 1);
+        var cow = sim.Cows[0];
+        for (int t = 0; t < 30 * 300 && cow.State != CowState.Walk; t++)
+        {
+            sim.Tick(Dt);
+        }
+        Assert.Equal(CowState.Walk, cow.State);
+
+        sim.TriggerEmote(cow, CowEmote.Jump);
+        Assert.Equal(CowEmote.Jump, cow.Emote);
+        Assert.NotEqual(CowState.Walk, cow.State);
+        double x = cow.Position.X;
+        for (int t = 0; t < 30; t++)
+        {
+            sim.Tick(Dt);
+            Assert.NotEqual(CowState.Walk, cow.State);
+            Assert.Equal(CowEmote.Jump, cow.Emote);
+        }
+        Assert.InRange(cow.Position.X, x - 1, x + 1);
+        for (int t = 0; t < 4; t++)
+        {
+            sim.Tick(Dt);
+        }
+        Assert.Equal(CowEmote.None, cow.Emote);
+
+        sim.TriggerEmote(cow, CowEmote.Moo);
+        Assert.Equal(CowState.Moo, cow.State);
+        Assert.True(cow.MooTriggered);
+        Assert.Equal(CowEmote.Moo, cow.Emote);
+        sim.Tick(Dt);
+        Assert.False(cow.MooTriggered);
+        Assert.Equal(CowEmote.Moo, cow.Emote);
+
+        // Spin replaces Moo; leaving cows ignore emotes.
+        sim.TriggerEmote(cow, CowEmote.Spin);
+        Assert.Equal(CowEmote.Spin, cow.Emote);
+        Assert.Equal(0, cow.EmoteElapsed);
+        sim.SetFillerCount(0);
+        Assert.Equal(CowLifecycle.Leaving, cow.Lifecycle);
+        Assert.Equal(CowEmote.None, cow.Emote);
+        sim.TriggerEmote(cow, CowEmote.Jump);
+        Assert.Equal(CowEmote.None, cow.Emote);
     }
 
     [Fact]

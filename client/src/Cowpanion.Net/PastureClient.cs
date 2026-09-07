@@ -84,10 +84,23 @@ public sealed class PastureClient : IAsyncDisposable
         }
     }
 
-    /// <summary>Sends a chat frame if connected. Returns false when not connected (nothing is queued).</summary>
-    public async Task<bool> SendChatAsync(string text)
+    /// <summary>Sends a text chat frame if connected. Returns false when not connected (nothing is queued).</summary>
+    public Task<bool> SendChatAsync(string text)
     {
-        if (string.IsNullOrWhiteSpace(text))
+        return SendChatAsync(text, "", "");
+    }
+
+    /// <summary>
+    /// Sends a v2 chat frame carrying any combination of text, emote (<c>moo</c>/<c>jump</c>/<c>spin</c>) and
+    /// reaction (1–3 emoji). Returns false when nothing survives normalisation or when not connected; nothing is
+    /// queued. Sends never overlap the heartbeat (one outstanding send at a time).
+    /// </summary>
+    public async Task<bool> SendChatAsync(string text, string emote, string reaction)
+    {
+        text = string.IsNullOrWhiteSpace(text) ? "" : text.Trim();
+        emote = ProtocolConstants.IsEmote(emote) ? emote : "";
+        reaction = string.IsNullOrWhiteSpace(reaction) ? "" : reaction.Trim();
+        if (text.Length == 0 && emote.Length == 0 && reaction.Length == 0)
         {
             return false;
         }
@@ -96,6 +109,10 @@ public sealed class PastureClient : IAsyncDisposable
             // The server truncates grapheme-safely at 140; we only guard the frame size here.
             text = text.Substring(0, ProtocolConstants.MaxChatChars * 2);
         }
+        if (reaction.Length > 64)
+        {
+            reaction = reaction.Substring(0, 64);
+        }
         var socket = _socket;
         if (socket is null || socket.State != WebSocketState.Open || State != ConnectionState.Connected)
         {
@@ -103,7 +120,7 @@ public sealed class PastureClient : IAsyncDisposable
         }
         try
         {
-            await SendAsync(socket, MessageCodec.EncodeChat(text), _stop.Token).ConfigureAwait(false);
+            await SendAsync(socket, MessageCodec.EncodeChat(text, emote, reaction), _stop.Token).ConfigureAwait(false);
             return true;
         }
         catch (Exception ex) when (ex is WebSocketException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
@@ -367,7 +384,11 @@ public sealed class PastureClient : IAsyncDisposable
             case WelcomeMessage w:
                 YourId = w.YourId;
                 onWelcome();
-                Emit($"welcome: pasture={w.Pasture} visibleCap={w.VisibleCap}");
+                if (w.ProtocolVersion != 1 && w.ProtocolVersion != 2)
+                {
+                    Emit($"welcome: unexpected protocolVersion {w.ProtocolVersion} (continuing)");
+                }
+                Emit($"welcome: v{w.ProtocolVersion} pasture={w.Pasture} visibleCap={w.VisibleCap}");
                 break;
             case PresenceMessage p:
                 MembersChanged?.Invoke(new PresenceSnapshot(p.Members, p.Overflow));

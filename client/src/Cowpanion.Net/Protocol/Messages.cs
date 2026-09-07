@@ -2,13 +2,22 @@ using Cowpanion.Core.Simulation;
 
 namespace Cowpanion.Net.Protocol;
 
-/// <summary>Protocol constants from cowpanion-protocol.md v1.</summary>
+/// <summary>Protocol constants from cowpanion-protocol.md v2.</summary>
 public static class ProtocolConstants
 {
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2;
     public const int MaxFrameBytes = 4096;
     public const int MaxChatChars = 140;
     public const int VisibleCap = 12;
+    /// <summary>A reaction is 1–3 emoji grapheme clusters; the server truncates longer ones.</summary>
+    public const int MaxReactionGraphemes = 3;
+    /// <summary>The only emote names the wire accepts.</summary>
+    public static readonly string[] Emotes = ["moo", "jump", "spin"];
+
+    public static bool IsEmote(string? emote)
+    {
+        return emote is not null && Array.IndexOf(Emotes, emote) >= 0;
+    }
 
     public const int CloseVersionMismatch = 4000;
     public const int ClosePastureFull = 4001;

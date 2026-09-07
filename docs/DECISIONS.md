@@ -147,3 +147,46 @@ presence, the offline herd is only the self cow. Fillers appear only if no prese
 the connection settings change. Multiplayer off keeps the immediate full offline herd. The 20 s
 `FallbackGrace` for mid-session drops is unchanged.
 
+
+## Fourth round: interaction quick wins (2026-09-07)
+
+Owner asked for hover name tags, cursor reactions, emotes, floating emoji reactions, and a fix for
+"my own cow barely moves from where it started". Decisions taken while implementing:
+
+- **Root cause of the stuck cow**: the 1-D hard separation plus "blocked walkers turn around"
+  meant a cow could never pass a neighbour, so every cow was confined to the slot between its two
+  neighbours for the whole session; walk direction also kept the current facing most of the time,
+  and cohesion pulled walkers back to the herd mean. Fix: (a) **wander targets** — a cow starting a
+  walk picks a destination anywhere on the strip and walks until it gets there or the walk times
+  out; (b) **passing lane** — a walker blocked by a stationary cow steps into a back lane
+  (`Cow.Lane` 1, drawn a few DIPs higher and behind), passes, and returns to the front lane when
+  clear. Resting cows always stand in the front lane, so the strip still reads as one row.
+  Separation only applies between cows in the same lane. "Never overlap" now means never within
+  the same lane.
+- **Hover name tag**: the cursor resting on a cow for ~0.4 s shows a small name label above it
+  (name for members, "cow" for fillers, "you" marker for self). Read-only; the window stays
+  click-through.
+- **Cursor reactions**: a hovered relaxed cow looks up (idle2 row) while the cursor stays; a fast
+  cursor sweep (> ~1500 DIPs/s) startles cows within ~150 DIPs into a short spooked walk away,
+  with a per-cow cooldown. Existing look/follow/spook behaviour stays.
+- **Protocol v2** (`docs/cowpanion-protocol.md`): the `chat` frame gains optional `emote`
+  (`moo` | `jump` | `spin`) and `reaction` (1–3 emoji graphemes, drawn as floating emoji above the
+  cow, no bubble). `text` becomes optional; a frame needs at least one of the three. Same rate
+  limit. **Server accepts hello v1 and v2**: v1 members receive text-only chat in the v1 shape and
+  never receive emote-only or reaction-only frames. `welcome.protocolVersion` echoes the version
+  the client sent. Rationale: friends on the old build keep working until they update.
+- **Chat box shortcuts**: `/moo`, `/jump`, `/spin` send an emote; a message that is only 1–3 emoji
+  is sent as a reaction; `/heart` `/love` (❤️), `/lol` (😂), `/wave` (👋), `/party` (🎉),
+  `/wow` (😮), `/sad` (😢) expand to reactions. Global hotkey **Ctrl+Alt+H** sends a heart.
+- **Emotes are visual only**: `moo` plays the moo row (and the sound hook); `jump` and `spin` are
+  procedural (vertical hop; rapid facing flips rendered without a `Turn`). The simulator only
+  times the emote and holds the cow still; the renderer draws it.
+- Emotes and reactions obey the existing **Mute bubbles** toggle: muted means no bubbles, no emoji,
+  no emotes from others.
+- **Sim tuning that fell out of the roaming fix** (Core): wander destinations persist across
+  rests (a cow ambles toward its target over several walks, pausing to graze) because a single
+  4–14 s walk only covers ~150 DIPs; minimum wander distance is 30 % of the strip; the Laziness
+  penalty on Idle/Graze→Walk was softened from `(1.3 − lazy)` to `(1.3 − 0.7·lazy)` so very lazy
+  cows still cross the screen within about ten minutes; a blocked walker keeps its destination and
+  only steps back briefly (up to three times per journey) before giving up. Cows in the back lane
+  head for the nearest front gap rather than idling behind others.

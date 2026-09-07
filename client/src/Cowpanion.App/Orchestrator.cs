@@ -121,6 +121,7 @@ internal sealed class Orchestrator : IDisposable
         }
         _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_C, ArmChat);
         _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_M, ToggleMute);
+        _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_H, SendHeart);
 
         _awaitingFirstPresence = _config.MultiplayerEnabled;
         BuildStrips();
@@ -132,6 +133,7 @@ internal sealed class Orchestrator : IDisposable
         _tray.FillerDelta += delta => Mutate(c => c.OfflineHerdSize = Math.Clamp(c.OfflineHerdSize + delta, 0, 12));
         _tray.VariantSelected += v => Mutate(c => c.Variant = v);
         _tray.MuteToggled += ToggleMute;
+        _tray.HeartRequested += SendHeart;
         _tray.MultiplayerToggled += () => Mutate(c => c.MultiplayerEnabled = !c.MultiplayerEnabled);
         _tray.StartupToggled += () => Mutate(c => c.StartWithWindows = !c.StartWithWindows);
         RefreshTray();
@@ -204,10 +206,12 @@ internal sealed class Orchestrator : IDisposable
             var window = new OverlayWindow(monitor);
             var herd = new HerdRenderer(window.HerdCanvas, _sprites, _config.Scale, OverlayWindow.StripHeightDips - GroundInsetDips);
             var bubbles = new BubbleRenderer(window.BubbleCanvas, herd);
+            var hoverLabel = new HoverLabelRenderer(window.BubbleCanvas, herd);
+            var reactions = new ReactionRenderer(window.BubbleCanvas, herd);
             var simRef = sim;
             var chat = new ChatInputHost(window, herd, () => simRef, SendChatAsync, AppLog.Info);
             chat.StateChanged += () => ApplyFps(ChooseFps());
-            var strip = new Strip(monitor, window, sim, herd, bubbles, chat);
+            var strip = new Strip(monitor, window, sim, herd, bubbles, hoverLabel, reactions, chat);
             _strips.Add(strip);
             window.Show();
             AppLog.Info($"strip on {monitor.DeviceName}: work area {monitor.WorkAreaPx.Width}x{monitor.WorkAreaPx.Height}px @ {monitor.Scale:F2} → {monitor.WorkAreaWidthDips:F0} DIPs wide");
@@ -254,14 +258,20 @@ internal sealed class Orchestrator : IDisposable
                 var strip = _strips[i];
                 var sim = strip.Simulator;
 
+                Cow? hovered = null;
                 if (cursorOk && strip.TryToStripDips(cursor.X, cursor.Y, out double cx, out double cy))
                 {
                     sim.SetCursor(cx, present: cy > -160);
+                    if (cy >= 0 && cy <= OverlayWindow.StripHeightDips)
+                    {
+                        hovered = strip.Herd.HitTest(new Point(cx, cy), sim);
+                    }
                 }
                 else
                 {
                     sim.SetCursor(0, present: false);
                 }
+                sim.SetHovered(hovered);
 
                 sim.Tick(dt);
                 strip.Herd.Render(sim);
@@ -269,6 +279,8 @@ internal sealed class Orchestrator : IDisposable
                 {
                     strip.Bubbles.Update(sim, dt, strip.Window.StripWidthDips);
                 }
+                strip.HoverLabel.Update(sim, dt, strip.Window.StripWidthDips);
+                strip.Reactions.Update(dt);
                 strip.Chat.Tick(dt);
                 strip.Window.SetOverflow(sim.Overflow);
 
@@ -305,7 +317,7 @@ internal sealed class Orchestrator : IDisposable
         for (int i = 0; i < _strips.Count; i++)
         {
             var s = _strips[i];
-            if (!s.Simulator.AllStationary || s.Bubbles.AnyVisible || s.Chat.IsArmed)
+            if (!s.Simulator.AllStationary || s.Bubbles.AnyVisible || s.Reactions.AnyActive || s.HoverLabel.IsVisible || s.Chat.IsArmed)
             {
                 return _config.ActiveFps;
             }
@@ -346,6 +358,8 @@ internal sealed class Orchestrator : IDisposable
             {
                 s.Chat.Disarm("fullscreen");
                 s.Bubbles.ClearAll(s.Simulator);
+                s.Reactions.ClearAll();
+                s.HoverLabel.Clear();
                 s.Window.Hide();
             }
         }
@@ -387,6 +401,37 @@ internal sealed class Orchestrator : IDisposable
     private void ToggleMute()
     {
         Mutate(c => c.BubblesMuted = !c.BubblesMuted);
+    }
+
+    /// <summary>Ctrl+Alt+H / tray: a heart reaction from our cow. No arming, no focus change; the echo draws it.</summary>
+    private void SendHeart()
+    {
+        if (_suspended)
+        {
+            return;
+        }
+        var client = _client;
+        if (client is null || client.State != ConnectionState.Connected)
+        {
+            AppLog.Info("heart not sent: not connected");
+            return;
+        }
+        _ = SendReactionSafelyAsync(client, "❤️");
+    }
+
+    private static async Task SendReactionSafelyAsync(PastureClient client, string reaction)
+    {
+        try
+        {
+            if (!await client.SendChatAsync("", "", reaction))
+            {
+                AppLog.Info("reaction not sent: not connected");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info("reaction send failed: " + ex.GetType().Name);
+        }
     }
 
     private void OpenConfig()
@@ -456,6 +501,7 @@ internal sealed class Orchestrator : IDisposable
             foreach (var s in _strips)
             {
                 s.Bubbles.ClearAll(s.Simulator);
+                s.Reactions.ClearAll();
             }
         }
         if (!next.PauseOnFullscreen && _suspended)
@@ -668,28 +714,60 @@ internal sealed class Orchestrator : IDisposable
         {
             return;
         }
-        if (chat.Text.Length == 0)
+        bool hasText = chat.Text.Length > 0;
+        bool hasReaction = chat.Reaction.Length > 0;
+        CowEmote emote = ParseEmote(chat.Emote);
+        if (!hasText && !hasReaction && emote == CowEmote.None)
         {
             return;
         }
+        // The server echoes our own chat back to us, so the own cow is handled here too — never optimistically.
         foreach (var s in _strips)
         {
             var cow = s.Simulator.FindMember(chat.FromId);
-            if (cow is not null && cow.Lifecycle != CowLifecycle.Leaving)
+            if (cow is null || cow.Lifecycle == CowLifecycle.Leaving)
+            {
+                continue;
+            }
+            if (hasText)
             {
                 s.Bubbles.Enqueue(cow, chat.Text);
+            }
+            if (hasReaction)
+            {
+                s.Reactions.Emit(cow, chat.Reaction);
+            }
+            if (emote != CowEmote.None)
+            {
+                // Moo enters the Moo state and sets MooTriggered, so OnTick's existing path plays the sound if enabled.
+                s.Simulator.TriggerEmote(cow, emote);
             }
         }
     }
 
-    private Task<bool> SendChatAsync(string text)
+    private static CowEmote ParseEmote(string emote)
+    {
+        switch (emote)
+        {
+            case "moo":
+                return CowEmote.Moo;
+            case "jump":
+                return CowEmote.Jump;
+            case "spin":
+                return CowEmote.Spin;
+            default:
+                return CowEmote.None;
+        }
+    }
+
+    private Task<bool> SendChatAsync(string text, string emote, string reaction)
     {
         var client = _client;
         if (client is null)
         {
             return Task.FromResult(false);
         }
-        return client.SendChatAsync(text);
+        return client.SendChatAsync(text, emote, reaction);
     }
 
     // ---------------------------------------------------------------- system events

@@ -24,5 +24,17 @@ public sealed record HerdSettings
     /// <summary>Cursor distance at which cows notice it.</summary>
     public double CursorNoticeRadiusDips { get; init; } = 90.0;
 
+    /// <summary>Depth offset (Position.Y) of the back passing lane (<see cref="Cow.Lane"/> 1) relative to the front lane.</summary>
+    public double LaneDepthDips { get; init; } = 14.0;
+
+    /// <summary>How fast a cow slides between lanes. Bounded so a lane change is a glide, never a pop.</summary>
+    public double LaneChangeDipsPerSecond { get; init; } = 40.0;
+
+    /// <summary>Cursor speed above which nearby cows get startled into a short spooked walk.</summary>
+    public double StartleCursorSpeedDipsPerSecond { get; init; } = 1500.0;
+
+    /// <summary>Cows within this distance of a fast cursor are startled.</summary>
+    public double StartleRadiusDips { get; init; } = 150.0;
+
     public double MinGapDips => CowWidthDips + SeparationMarginDips;
 }

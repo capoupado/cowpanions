@@ -42,7 +42,7 @@ public class PastureClientTests
         using var doc = JsonDocument.Parse(first);
         var root = doc.RootElement;
         Assert.Equal("hello", root.GetProperty("t").GetString());
-        Assert.Equal(1, root.GetProperty("protocolVersion").GetInt32());
+        Assert.Equal(2, root.GetProperty("protocolVersion").GetInt32());
         Assert.Equal("a3f1c9e2b4d6f8a0c1e3b5d7f9a1c3e5", root.GetProperty("clientId").GetString());
         Assert.Equal("commons", root.GetProperty("pasture").GetString());
         Assert.Equal("Tester", root.GetProperty("displayName").GetString());
@@ -288,6 +288,58 @@ public class PastureClientTests
         Assert.Equal("chat", doc.RootElement.GetProperty("t").GetString());
         Assert.Equal("morning 😀", doc.RootElement.GetProperty("text").GetString());
         Assert.False(await client.SendChatAsync("   "));
+    }
+
+    [Fact]
+    public async Task Emote_is_sent_as_a_chat_frame_without_text()
+    {
+        await using var server = new LoopbackServer();
+        var clock = new ManualClock();
+        await using var client = new PastureClient(Options(server.Uri), clock, new Random(1));
+        Assert.False(await client.SendChatAsync("", "", ""));
+        client.Start();
+        var session = await HandshakeAsync(server);
+        await session.SendTextAsync("{\"t\":\"welcome\",\"protocolVersion\":2,\"yourId\":\"a3f1c9e2b4d6f8a0c1e3b5d7f9a1c3e5\",\"pasture\":\"commons\",\"visibleCap\":12,\"serverTime\":1}");
+        await Task.Delay(50);
+        Assert.True(await client.SendChatAsync("", "jump", ""));
+        string? frame = await session.ReceiveTextAsync();
+        Assert.NotNull(frame);
+        Assert.Contains("\"emote\":\"jump\"", frame);
+        Assert.DoesNotContain("\"text\"", frame);
+        using var doc = JsonDocument.Parse(frame);
+        Assert.Equal("chat", doc.RootElement.GetProperty("t").GetString());
+
+        Assert.True(await client.SendChatAsync("", "", "❤️"));
+        string? reactionFrame = await session.ReceiveTextAsync();
+        Assert.NotNull(reactionFrame);
+        using var doc2 = JsonDocument.Parse(reactionFrame);
+        Assert.Equal("❤️", doc2.RootElement.GetProperty("reaction").GetString());
+        Assert.False(doc2.RootElement.TryGetProperty("text", out _));
+
+        // An unknown emote name is dropped; with nothing else to send the call refuses.
+        Assert.False(await client.SendChatAsync("", "dance", ""));
+    }
+
+    [Fact]
+    public async Task Welcome_with_protocol_version_1_is_accepted()
+    {
+        await using var server = new LoopbackServer();
+        var clock = new ManualClock();
+        await using var client = new PastureClient(Options(server.Uri), clock, new Random(1));
+        var lines = new List<string>();
+        client.Log += l => { lock (lines) { lines.Add(l); } };
+        var presence = new TaskCompletionSource<PresenceSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.MembersChanged += p => presence.TrySetResult(p);
+        client.Start();
+        var session = await HandshakeAsync(server);
+        await session.SendTextAsync("{\"t\":\"welcome\",\"protocolVersion\":1,\"yourId\":\"a3f1c9e2b4d6f8a0c1e3b5d7f9a1c3e5\",\"pasture\":\"commons\",\"visibleCap\":12,\"serverTime\":1}");
+        await session.SendTextAsync("{\"t\":\"presence\",\"members\":[{\"id\":\"a3f1c9e2b4d6f8a0c1e3b5d7f9a1c3e5\",\"name\":\"Tester\",\"variant\":\"brown\"}],\"overflow\":0}");
+        await presence.Task.WaitAsync(T);
+        Assert.Equal(ConnectionState.Connected, client.State);
+        lock (lines)
+        {
+            Assert.Contains(lines, l => l.StartsWith("welcome: v1", StringComparison.Ordinal));
+        }
     }
 
     [Fact]

@@ -30,14 +30,29 @@ public static class MessageCodec
         return stream.ToArray();
     }
 
-    public static byte[] EncodeChat(string text)
+    /// <summary>
+    /// Encodes a v2 chat frame. Only non-empty fields are written; the caller guarantees at least one of them is
+    /// non-empty (the server drops an empty frame silently and still charges a rate-limit token).
+    /// </summary>
+    public static byte[] EncodeChat(string text, string emote = "", string reaction = "")
     {
-        using var stream = new MemoryStream(text.Length * 3 + 32);
+        using var stream = new MemoryStream(text.Length * 3 + reaction.Length * 3 + 48);
         using (var w = new Utf8JsonWriter(stream, WriterOptions))
         {
             w.WriteStartObject();
             w.WriteString("t", "chat");
-            w.WriteString("text", text);
+            if (text.Length > 0)
+            {
+                w.WriteString("text", text);
+            }
+            if (emote.Length > 0)
+            {
+                w.WriteString("emote", emote);
+            }
+            if (reaction.Length > 0)
+            {
+                w.WriteString("reaction", reaction);
+            }
             w.WriteEndObject();
         }
         return stream.ToArray();
@@ -91,7 +106,9 @@ public static class MessageCodec
                             GetString(root, "fromId", ""),
                             GetString(root, "name", "cow"),
                             GetString(root, "text", ""),
-                            GetLong(root, "ts", 0)));
+                            GetLong(root, "ts", 0),
+                            GetString(root, "emote", ""),
+                            GetString(root, "reaction", "")));
                     case "error":
                         return new ErrorMessage(GetString(root, "code", ""), GetString(root, "message", ""));
                     case "pong":

@@ -30,7 +30,7 @@ test('S1: three clients in one pasture each see all three in presence', async ()
   assert.equal(a.welcome.yourId, cid(1));
   assert.equal(a.welcome.pasture, 'trio');
   assert.equal(a.welcome.visibleCap, 12);
-  assert.equal(a.welcome.protocolVersion, 1);
+  assert.equal(a.welcome.protocolVersion, 2, 'helpers hello with the current version by default');
   assert.ok(Math.abs(a.welcome.serverTime - Date.now()) < 5000);
   closeAll([a, b, c]);
 });
@@ -163,7 +163,7 @@ test('S1: malformed JSON, 5KB frame, binary frame each close 4004 and the server
 
 test('S1: hello rejections: version mismatch -> error+4000, bad pasture -> pasture_invalid, bad clientId -> 4004', async () => {
   const v = await connect(S.port);
-  sendJson(v, { t: 'hello', protocolVersion: 2, clientId: cid(1), pasture: 'commons' });
+  sendJson(v, { t: 'hello', protocolVersion: 3, clientId: cid(1), pasture: 'commons' });
   assert.equal((await waitFor(v, (m) => m.t === 'error')).code, 'version');
   assert.equal((await v.closed).code, 4000);
   const p = await connect(S.port);
@@ -250,6 +250,97 @@ test('S2: log output never contains chat text', async () => {
   assert.ok(!all.includes(phrase), 'phrase must not appear in logs');
   assert.ok(all.includes('"event":"chat"'), 'chat event is logged (id + bytes only)');
   for (const line of S.logs) JSON.parse(line); // every line is one JSON object
+});
+
+test('V2: welcome echoes protocolVersion 1 to a v1 client and 2 to a v2 client', async () => {
+  const v1 = await join(S.port, { clientId: cid(301), pasture: 'ver', protocolVersion: 1 });
+  const v2 = await join(S.port, { clientId: cid(302), pasture: 'ver', protocolVersion: 2 });
+  assert.equal(v1.welcome.protocolVersion, 1);
+  assert.equal(v2.welcome.protocolVersion, 2);
+  assert.equal(v1.welcome.yourId, cid(301));
+  const p = await waitFor(v2, presenceWith(2));
+  assert.deepEqual(presenceIds(p), [cid(301), cid(302)], 'v1 and v2 members share one pasture');
+  closeAll([v1, v2]);
+});
+
+test('V2: emote-only chat reaches v2 members with emote and no text; v1 member receives nothing', async () => {
+  const a = await join(S.port, { clientId: cid(311), pasture: 'emote', displayName: 'Ann', protocolVersion: 2 });
+  const b = await join(S.port, { clientId: cid(312), pasture: 'emote', protocolVersion: 2 });
+  const old = await join(S.port, { clientId: cid(313), pasture: 'emote', protocolVersion: 1 });
+  await waitFor(a, presenceWith(3));
+  sendJson(a, { t: 'chat', emote: 'jump' });
+  for (const ws of [a, b]) {
+    const m = await waitFor(ws, (x) => x.t === 'chat');
+    assert.equal(m.emote, 'jump');
+    assert.equal(m.fromId, cid(311));
+    assert.equal(m.name, 'Ann');
+    assert.ok(!('text' in m), 'no text field');
+    assert.ok(!('reaction' in m), 'no reaction field');
+    assert.ok(Math.abs(m.ts - Date.now()) < 5000);
+  }
+  await sleep(150);
+  assert.equal(old.inbox.filter((x) => x.t === 'chat').length, 0, 'v1 member gets no emote frame');
+  assert.equal(old.readyState, WebSocket.OPEN);
+  closeAll([a, b, old]);
+});
+
+test('V2: text+reaction reaches v1 as text only (v1 shape) and v2 with both', async () => {
+  const heart = '\u2764\uFE0F';
+  const a = await join(S.port, { clientId: cid(321), pasture: 'react', displayName: 'Ann', protocolVersion: 2 });
+  const old = await join(S.port, { clientId: cid(322), pasture: 'react', protocolVersion: 1 });
+  await waitFor(a, presenceWith(2));
+  sendJson(a, { t: 'chat', text: 'hi', reaction: heart });
+  const m2 = await waitFor(a, (x) => x.t === 'chat');
+  assert.deepEqual(Object.keys(m2).sort(), ['fromId', 'name', 'reaction', 't', 'text', 'ts']);
+  assert.equal(m2.text, 'hi');
+  assert.equal(m2.reaction, heart);
+  const m1 = await waitFor(old, (x) => x.t === 'chat');
+  assert.deepEqual(Object.keys(m1).sort(), ['fromId', 'name', 't', 'text', 'ts']);
+  assert.equal(m1.text, 'hi');
+  assert.equal(m1.fromId, cid(321));
+  // reaction-only: v2 gets it, v1 gets nothing
+  sendJson(a, { t: 'chat', reaction: heart });
+  assert.deepEqual(Object.keys(await waitFor(a, (x) => x.t === 'chat')).sort(), ['fromId', 'name', 'reaction', 't', 'ts']);
+  await sleep(150);
+  assert.equal(old.inbox.filter((x) => x.t === 'chat').length, 0);
+  closeAll([a, old]);
+});
+
+test('V2: invalid or empty chat payload (unknown emote, non-emoji reaction) is relayed to nobody', async () => {
+  const a = await join(S.port, { clientId: cid(331), pasture: 'junk', protocolVersion: 2 });
+  const b = await join(S.port, { clientId: cid(332), pasture: 'junk', protocolVersion: 2 });
+  await waitFor(a, presenceWith(2));
+  sendJson(a, { t: 'chat', emote: 'dance' });
+  sendJson(a, { t: 'chat', reaction: 'hi' });
+  sendJson(a, { t: 'chat' });
+  await sleep(150);
+  assert.equal(a.inbox.filter((x) => x.t === 'chat').length, 0);
+  assert.equal(b.inbox.filter((x) => x.t === 'chat').length, 0);
+  assert.equal(a.readyState, WebSocket.OPEN);
+  // a valid frame from a fresh sender still goes through (the three above spent a's tokens)
+  sendJson(b, { t: 'chat', emote: 'moo' });
+  assert.equal((await waitFor(a, (x) => x.t === 'chat')).emote, 'moo');
+  closeAll([a, b]);
+});
+
+test('V2: log never contains the reaction emoji or text; chat line has bytes + emote/reaction flags', async () => {
+  const rare = '\u{1FAB6}'; // feather: unlikely to appear in any other log line
+  const phrase = 'giraffe-lantern-' + Math.random().toString(36).slice(2);
+  const a = await join(S.port, { clientId: cid(341), pasture: 'privlog', protocolVersion: 2 });
+  sendJson(a, { t: 'chat', text: phrase, emote: 'spin', reaction: rare });
+  const m = await waitFor(a, (x) => x.t === 'chat');
+  assert.equal(m.reaction, rare);
+  const all = S.logs.join('\n');
+  assert.ok(!all.includes(rare), 'emoji must not appear in logs');
+  assert.ok(!all.includes(JSON.stringify(rare).slice(1, -1)), 'nor its escaped form');
+  assert.ok(!all.includes(phrase), 'text must not appear in logs');
+  const line = S.logs.map((l) => JSON.parse(l)).findLast((l) => l.event === 'chat' && l.fromId === cid(341));
+  assert.equal(line.bytes, Buffer.byteLength(phrase));
+  assert.equal(line.emote, true);
+  assert.equal(line.reaction, true);
+  assert.ok(!('text' in line));
+  assert.ok(!all.includes('"spin"'), 'emote name is not logged either');
+  closeAll([a]);
 });
 
 test('S3: banned clientId gets error+4003, clean clientId joins; ban takes effect on connected member', async () => {
