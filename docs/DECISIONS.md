@@ -121,3 +121,9 @@ The VPS runs nginx. `server/deploy/` now ships `nginx-cows.conf` (https site wit
 proxy, `proxy_read_timeout 300s`, HSTS, own logs under `/var/log/nginx/cows/`), an http-only
 `nginx-cows-bootstrap.conf` used until certbot has produced the certificate, and
 `logrotate-nginx-cows`. The server plan document still says Apache; this file supersedes it.
+
+## Cloudflare in front of nginx (2026-09-07)
+
+DNS for `cows.carlospoupado.com` resolves to Cloudflare. nginx maps `CF-Connecting-IP` into
+`X-Forwarded-For` so the server's per-IP cap sees real client addresses. Cloudflare's 100 s
+WebSocket idle timeout is comfortably above the 20 s heartbeat.

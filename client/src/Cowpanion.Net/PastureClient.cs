@@ -30,6 +30,8 @@ public sealed class PastureClient : IAsyncDisposable
     private readonly Random _rng;
     private readonly CancellationTokenSource _stop = new();
     private readonly object _gate = new();
+    // ClientWebSocket allows one outstanding SendAsync at a time; the heartbeat and chat sends must not overlap.
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     private Task? _loop;
     private ClientWebSocket? _socket;
@@ -384,9 +386,17 @@ public sealed class PastureClient : IAsyncDisposable
         }
     }
 
-    private static Task SendAsync(ClientWebSocket socket, byte[] payload, CancellationToken ct)
+    private async Task SendAsync(ClientWebSocket socket, byte[] payload, CancellationToken ct)
     {
-        return socket.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true, ct);
+        await _sendLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await socket.SendAsync(new ArraySegment<byte>(payload), WebSocketMessageType.Text, true, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     private void SetState(ConnectionState state)

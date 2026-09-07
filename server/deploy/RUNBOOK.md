@@ -15,6 +15,15 @@ node -v   # must print v22.13 or newer (v22.5–22.12 need --experimental-sqlite
 
 ## 1. DNS
 
+> **Cloudflare.** `cows.carlospoupado.com` is proxied through Cloudflare (orange cloud). That is
+> fine — Cloudflare passes WebSockets and its idle timeout (100 s) is well above the 20 s ping —
+> but three things follow: (1) the nginx site takes the client IP from `CF-Connecting-IP`, not
+> `$remote_addr`, otherwise every user counts as one Cloudflare address for the per-IP cap;
+> (2) the Cloudflare SSL/TLS mode must be **Full (strict)**; a `525` error on the client means
+> Cloudflare could not complete TLS to the origin (typically: certificate not installed yet);
+> (3) the ACME webroot challenge still works through Cloudflare because it is plain http.
+
+
 Create an **A record** `cows.carlospoupado.com` → the VPS IPv4 (and an AAAA record if the VPS
 has IPv6). Wait until it resolves from your PC:
 
