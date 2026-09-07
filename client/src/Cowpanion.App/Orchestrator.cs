@@ -125,6 +125,7 @@ internal sealed class Orchestrator : IDisposable
         _tray.VariantSelected += v => Mutate(c => c.Variant = v);
         _tray.MuteToggled += ToggleMute;
         _tray.MultiplayerToggled += () => Mutate(c => c.MultiplayerEnabled = !c.MultiplayerEnabled);
+        _tray.StartupToggled += () => Mutate(c => c.StartWithWindows = !c.StartWithWindows);
         RefreshTray();
 
         StartupRegistration.Apply(_config.StartWithWindows, AppLog.Info);

@@ -14,6 +14,7 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _status = new("Starting…") { Enabled = false };
     private readonly WinForms.ToolStripMenuItem _multiplayer = new("Multiplayer") { CheckOnClick = false };
     private readonly WinForms.ToolStripMenuItem _mute = new("Mute bubbles (Ctrl+Alt+M)");
+    private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
     private readonly WinForms.ToolStripMenuItem _colour = new("Cow colour");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
     private readonly WinForms.ToolStripMenuItem _fillerMinus = new("Filler herd −");
@@ -32,6 +33,7 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(_fillerPlus);
         _menu.Items.Add(_fillerMinus);
         _menu.Items.Add(new WinForms.ToolStripSeparator());
+        _menu.Items.Add(_startup);
         var open = new WinForms.ToolStripMenuItem("Open config");
         var reload = new WinForms.ToolStripMenuItem("Reload config");
         var quit = new WinForms.ToolStripMenuItem("Quit (Ctrl+Alt+Shift+K)");
@@ -49,6 +51,7 @@ internal sealed class TrayIconHost : IDisposable
 
         _multiplayer.Click += (_, _) => MultiplayerToggled?.Invoke();
         _mute.Click += (_, _) => MuteToggled?.Invoke();
+        _startup.Click += (_, _) => StartupToggled?.Invoke();
         _fillerPlus.Click += (_, _) => FillerDelta?.Invoke(+1);
         _fillerMinus.Click += (_, _) => FillerDelta?.Invoke(-1);
         open.Click += (_, _) => OpenConfigRequested?.Invoke();
@@ -71,12 +74,14 @@ internal sealed class TrayIconHost : IDisposable
     public event Action<string>? VariantSelected;
     public event Action? MuteToggled;
     public event Action? MultiplayerToggled;
+    public event Action? StartupToggled;
 
     public void Update(CowpanionConfig config, string status)
     {
         _status.Text = status;
         _multiplayer.Checked = config.MultiplayerEnabled;
         _mute.Checked = config.BubblesMuted;
+        _startup.Checked = config.StartWithWindows;
         _fillerPlus.Text = "Filler herd + (now " + config.OfflineHerdSize.ToString(CultureInfo.InvariantCulture) + ")";
         _fillerMinus.Text = "Filler herd −";
         _fillerPlus.Enabled = config.OfflineHerdSize < 12;

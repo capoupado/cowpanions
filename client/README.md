@@ -106,3 +106,15 @@ Open config · Reload config · Quit.
 - `Cowpanion.Core` must stay free of UI/network references: it is what makes the herd testable.
 - The tick path allocates nothing: no per-frame `CroppedBitmap`, no LINQ, no `ObservableCollection`.
 - `DispatcherTimer` quantises to the ~15.6 ms system tick, so the interval is set a few ms under `1000/fps`.
+
+## Installing on another PC
+
+1. Copy the `Cowpanion-win-x64` folder (from `dotnet publish`, or the zip in `dist/`) to a
+   permanent location, e.g. `%LOCALAPPDATA%\Cowpanion`. Do not run it from Downloads: the
+   "Start with Windows" entry points at wherever the exe lives.
+2. Run `Cowpanion.exe`. First run asks for a display name; everything else is defaults
+   (pasture `commons`, server `wss://cows.carlospoupado.com/ws`).
+3. Tray icon → **Start with Windows** to launch at logon (writes `HKCU\...\Run\Cowpanion`).
+   Untick it, or set `startWithWindows: false` in the config, to remove the entry.
+
+No installer, no admin rights, nothing outside `%LOCALAPPDATA%` and `%APPDATA%\Cowpanion`.
