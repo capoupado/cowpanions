@@ -190,6 +190,7 @@ internal sealed class Orchestrator : IDisposable
             sim.SetCowWidth(cowWidth);
             sim.SetSleepAfterIdleSeconds(_config.SleepAfterIdleMinutes * 60.0);
             sim.SetBounds(monitor.WorkAreaWidthDips);
+            sim.SetFillerVariants(_manifest.VariantNames);
 
             var window = new OverlayWindow(monitor);
             var herd = new HerdRenderer(window.HerdCanvas, _sprites, _config.Scale, OverlayWindow.StripHeightDips - GroundInsetDips);
@@ -435,10 +436,7 @@ internal sealed class Orchestrator : IDisposable
         }
         if (prev.OfflineHerdSize != next.OfflineHerdSize && !_online)
         {
-            foreach (var s in _strips)
-            {
-                s.Simulator.SetFillerCount(next.OfflineHerdSize);
-            }
+            ApplyOffline();
         }
         if (prev.StartWithWindows != next.StartWithWindows)
         {
@@ -610,12 +608,21 @@ internal sealed class Orchestrator : IDisposable
         }
     }
 
+    /// <summary>
+    /// Offline herd: the user's own cow (own colour, self marker) plus offlineHerdSize − 1 fillers, so colour and
+    /// name changes are visible without a server. When presence arrives the self cow is already there and stays.
+    /// offlineHerdSize 0 means no cows at all.
+    /// </summary>
     private void ApplyOffline()
     {
+        int herd = _config.OfflineHerdSize;
+        var members = herd >= 1
+            ? new[] { new Member(_config.ClientId, _config.DisplayName, _config.Variant) }
+            : Array.Empty<Member>();
         foreach (var s in _strips)
         {
-            s.Simulator.SyncMembers(Array.Empty<Member>(), "", 0);
-            s.Simulator.SetFillerCount(_config.OfflineHerdSize);
+            s.Simulator.SyncMembers(members, _config.ClientId, 0);
+            s.Simulator.SetFillerCount(Math.Max(0, herd - 1));
         }
     }
 

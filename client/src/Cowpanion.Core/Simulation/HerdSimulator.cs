@@ -23,6 +23,15 @@ public sealed class HerdSimulator
     private bool _cursorPresent;
     private double _cursorX;
 
+    /// <summary>
+    /// Leaving cows trot at a fixed multiple of base speed, personality ignored, so an exit reads as intentional
+    /// rather than a cow wandering off: 3.5 × 18 ≈ 63 DIPs/s, at most ~22 s from the middle of a 2560-DIP strip.
+    /// </summary>
+    private const double LeaveSpeedFactor = 3.5;
+
+    private int _fillersCreated;
+    private IReadOnlyList<string> _fillerVariants = Array.Empty<string>();
+
     public HerdSimulator(int seed, HerdSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -43,6 +52,13 @@ public sealed class HerdSimulator
         }
         _cowWidth = widthDips;
         SetBounds(_width);
+    }
+
+    /// <summary>Colour names filler cows may use. Each filler slot picks one deterministically from the seed and its index.</summary>
+    public void SetFillerVariants(IReadOnlyList<string> variantNames)
+    {
+        ArgumentNullException.ThrowIfNull(variantNames);
+        _fillerVariants = variantNames;
     }
 
     public void SetSleepAfterIdleSeconds(double seconds)
@@ -249,6 +265,12 @@ public sealed class HerdSimulator
         while (present < n)
         {
             var cow = CreateCow(null, Personality.FromRandom(_rng));
+            if (_fillerVariants.Count > 0)
+            {
+                ulong h = StableHash.Fnv1a64("filler|" + _fillersCreated.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                cow.Variant = _fillerVariants[(int)(h % (ulong)_fillerVariants.Count)];
+            }
+            _fillersCreated++;
             Spawn(cow, walkIn: _everTicked);
             present++;
         }
@@ -492,7 +514,7 @@ public sealed class HerdSimulator
             EnterState(cow, CowState.Walk);
         }
         cow.StateDuration = 1e9;
-        cow.Position.X += cow.Facing * WalkSpeed(cow) * dt;
+        cow.Position.X += cow.Facing * _settings.BaseSpeedDips * LeaveSpeedFactor * dt;
     }
 
     private void TickPresent(Cow cow, double dt, bool sleepAllowed, double meanX)

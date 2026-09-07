@@ -101,3 +101,16 @@ Both tracks must follow them.
 - No `moo.wav` exists; provide one or drop the moo feature.
 - Chat-mode also drops `WS_EX_NOACTIVATE` while armed (required for the TextBox to receive keys);
   restored together with `WS_EX_TRANSPARENT`. Accepted as a necessary amendment to the hard rule.
+
+## Third round (after the owner's first manual run, 2026-09-07)
+
+- **Sprite art faces right**, not left. Manifest `facing` corrected; cows now walk head-first.
+- **Leaving cows trot**: a cow that is no longer needed (filler count reduced, member gone)
+  walks to the nearest edge at a fixed 3.5 × base speed (~63 DIPs/s, personality ignored), so an
+  exit takes at most ~22 s on a 2560-DIP strip. The slow grazing-speed walk-out was what read as
+  "the herd walks off screen". Present cows have always been hard-clamped to the strip.
+- **Offline herd includes the user's own cow** (own colour, self marker) plus
+  `offlineHerdSize − 1` fillers, so colour and name changes are visible without a server. The
+  self cow stays when presence arrives. `offlineHerdSize: 0` means no cows at all.
+- **Fillers get stable hashed colours** from the seven sheets (same colours every launch).
+- Still open: sleep trigger (user inactivity vs herd stillness), no `moo.wav`.

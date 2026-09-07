@@ -87,6 +87,51 @@ public class HerdLifecycleTests
     }
 
     [Fact]
+    public void Leaving_cow_is_gone_within_30_seconds_on_a_wide_strip()
+    {
+        var sim = NewSim(11);
+        sim.SetFillerCount(4);
+        RunAndCheck(sim, 5, "start");
+        sim.SetFillerCount(3);
+        RunAndCheck(sim, 30, "leave");
+        AssertSettled(sim, 3, "leave");
+    }
+
+    [Fact]
+    public void Filler_colours_are_varied_and_stable_across_launches()
+    {
+        string[] names = { "black0", "black1", "brown", "white0", "white1", "white_darkspots", "white_pinkspots" };
+        var a = NewSim(3);
+        a.SetFillerVariants(names);
+        a.SetFillerCount(6);
+        var b = NewSim(3);
+        b.SetFillerVariants(names);
+        b.SetFillerCount(6);
+        Assert.Equal(a.Cows.Select(c => c.Variant), b.Cows.Select(c => c.Variant));
+        Assert.True(a.Cows.Select(c => c.Variant).Distinct().Count() >= 3, "expected at least three different colours among six fillers");
+        Assert.All(a.Cows, c => Assert.Contains(c.Variant, names));
+    }
+
+    [Fact]
+    public void Offline_self_cow_survives_presence_arrival()
+    {
+        var sim = NewSim(5);
+        sim.SyncMembers(new[] { Self }, Self.Id, 0);
+        sim.SetFillerCount(3);
+        RunAndCheck(sim, 5, "offline");
+        var self = sim.FindSelf();
+        Assert.NotNull(self);
+        double xBefore = self!.Position.X;
+
+        sim.SetFillerCount(0);
+        sim.SyncMembers(new[] { Self, A }, Self.Id, 0);
+        sim.Tick(Dt);
+        Assert.Same(self, sim.FindSelf());
+        Assert.Equal(CowLifecycle.Present, self.Lifecycle);
+        Assert.InRange(self.Position.X, xBefore - 5, xBefore + 5);
+    }
+
+    [Fact]
     public void Filler_count_changes_while_running_settle()
     {
         var sim = NewSim(9);
