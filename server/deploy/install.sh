@@ -57,6 +57,14 @@ fi
 [ -f "$SERVER_DIR/package.json" ] || die "$SERVER_DIR/package.json missing — wrong repo or branch?"
 git -C "$APP_DIR" log -1 --format='   deployed commit %h %s'
 
+# If the pull changed this very script, run the new version instead of continuing with the
+# copy bash already loaded (otherwise new config files get installed by old install steps).
+SELF="$DEPLOY_DIR/install.sh"
+if [ -z "${COWPANION_REEXEC:-}" ] && [ -f "$SELF" ] && ! cmp -s "$SELF" "${BASH_SOURCE[0]}"; then
+  log "install.sh changed by the pull — re-running the new version"
+  COWPANION_REEXEC=1 exec bash "$SELF"
+fi
+
 # 3. dependencies -------------------------------------------------------------
 log "npm ci --omit=dev"
 (cd "$SERVER_DIR" && npm ci --omit=dev --no-audit --no-fund)
