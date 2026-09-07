@@ -84,3 +84,20 @@ Both tracks must follow them.
   for the owner, each marked "automated: pass/fail" or "manual: to verify".
 - P0 must remain runnable on its own as a separate executable (`client/spike/Cowpanion.Spike`)
   so the CPU measurement can still be done independently.
+
+## Second round (after the server track reported)
+
+- Repository: `https://github.com/capoupado/cowpanions.git`, branch `main`. `install.sh`
+  defaults to it; the local repo has it as `origin` (nothing pushed yet).
+- Per-IP connection cap stays at **4** (`COWPANION_IP_CAP` in the unit if it ever needs raising).
+- **fail2ban is not installed.** Removed from `install.sh`, runbook and acceptance list.
+- VPS Node version unknown; runbook has the `node -v` check and the sqlite flag note.
+
+## Open questions from the client track (not yet decided)
+
+- Sleep trigger: currently *user* inactivity (cursor/chat resets the timer). Alternative: herd
+  stillness for N minutes.
+- Filler cows all render `brown`; could instead be hashed per filler index for variety.
+- No `moo.wav` exists; provide one or drop the moo feature.
+- Chat-mode also drops `WS_EX_NOACTIVATE` while armed (required for the TextBox to receive keys);
+  restored together with `WS_EX_TRANSPARENT`. Accepted as a necessary amendment to the hard rule.
