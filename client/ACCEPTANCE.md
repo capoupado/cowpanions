@@ -1,0 +1,106 @@
+# Cowpanion client — acceptance checklist
+
+Status legend:
+
+- **automated: pass** — covered by a test that passed in `dotnet test` (test name given).
+- **observed: …** — I launched the binary on this machine (always with `--exit-after`, offline unless stated) and saw this. Indicative only.
+- **manual: to verify** — needs the owner, real hardware, a second machine or the deployed server. Steps given.
+
+Everything below was run on 2026-09-07 on the dev machine (Windows 11, single 2560-wide monitor at 100 % DPI,
+16 logical CPUs). The pasture server was not deployed at the time, so every multiplayer criterion that needs a
+live server is marked manual.
+
+Final run: `dotnet build -c Release` → 0 warnings, 0 errors. `dotnet test -c Release` → Core 35/35, Net 18/18.
+
+---
+
+## Hard rules (every phase)
+
+| Rule | Where | Status |
+| --- | --- | --- |
+| Never steals focus (`WS_EX_NOACTIVATE`) | `Interop/OverlayWindowStyler.ApplyOverlayStyles`, called from `OverlayWindow.OnSourceInitialized`; window has `ShowActivated=False`, `Focusable=False` | observed: launching the app while typing in this terminal never moved focus (commands kept executing). manual: to verify — launch, keep typing in Notepad, confirm no keystroke is lost at launch or during 60 s. |
+| Never in alt-tab or taskbar (`WS_EX_TOOLWINDOW`, `ShowInTaskbar=False`) | same, plus `OverlayWindow.xaml` | manual: to verify — press Alt+Tab and look at the taskbar; "Cowpanion" must not appear (only the tray icon). |
+| Input-transparent by default (`WS_EX_TRANSPARENT`); dropped only while chat mode is armed, bounded, with an indicator, auto-restoring | `OverlayWindowStyler.SetInteractive`; `Overlay/ChatInputHost.cs` (8 s idle, Enter, Esc, click elsewhere, `finally`), `Orchestrator.OnTopmostTimer` re-checks every 4 s | observed: `--inject-chat-exception` run logged `chat arm failed … injected` immediately followed by `chat mode disarmed (arm failed)`; a subsequent Ctrl+Alt+C armed normally and Esc disarmed. manual: to verify — click and drag on the desktop, the taskbar and a browser through the cows; everything must land underneath. |
+| Global kill hotkey `Ctrl+Alt+Shift+K` from P0, registered before the overlay window | Spike: `App.RegisterKillHotkey()` runs before `new SpikeWindow()`. App: `Orchestrator.Start()` registers on `GlobalHotkeys` (message-only HWND) before `BuildStrips()` | observed: sending Ctrl+Alt+Shift+K via `SendKeys` quit the App within 1 s (`quit: kill hotkey` in log, process exited). |
+| Bubble-mute hotkey `Ctrl+Alt+M`, persisted | `Orchestrator.ToggleMute` → `Mutate` → `ConfigStore.Save` | observed: after sending Ctrl+Alt+M the config file contained `"bubblesMuted": true`. |
+| Single instance (`Global\Cowpanion`) | `App.TryAcquireMutex` | manual: to verify — launch twice; the second exits silently (Task Manager shows one `Cowpanion.exe`). |
+| Silent by default (`mooEnabled=false`, no audio before P4) | `CowpanionConfig.MooEnabled = false`; `Audio/MooPlayer` is a no-op without `assets/audio/moo.wav` (none shipped) | automated: pass (`ConfigTests.Missing_file_is_created_with_defaults_and_a_client_id` asserts `MooEnabled` false). |
+| Cows stay inside the monitor work area, above the taskbar | `OverlayWindow.Place()` uses `Screen.WorkingArea` (physical px) ÷ DPI scale; `HerdSimulator` clamps X to `[w/2, width−w/2]` | automated: pass (`HerdSimulatorTests.Cows_stay_inside_bounds_for_ten_minutes`). observed: screenshot of the bottom 300 px of the work area showed all six cows standing on the ground line just above the taskbar. |
+| Multiplayer never load-bearing | `Orchestrator.StartClientIfEnabled` is queued at `ApplicationIdle` after the strips are shown; `ApplyOffline()` puts filler cows up at startup; `PastureClient` only raises events | observed: with the server unreachable the app started instantly with 3 filler cows, logged backoff 2.1 s → 4.0 s → 7.9 s → 17.8 s and exited cleanly; no dialog. automated: pass (`PastureClientTests.Unreachable_server_backs_off_instead_of_failing`). |
+| No telemetry, no auto-update, no other network calls | Only `Cowpanion.Net.PastureClient` opens a socket; grep for `HttpClient`/`WebRequest` in `src/` finds nothing | observed by code review; `PRIVACY.md` documents it. |
+
+---
+
+## P0 — Feasibility spike (`spike/Cowpanion.Spike`)
+
+- [ ] Clicks and drags anywhere over the strip reach the window underneath, incl. taskbar and desktop — **manual: to verify**: run `dotnet run --project spike/Cowpanion.Spike -c Release -- --exit-after 300`, then click desktop icons, drag a file, click taskbar buttons inside the bottom 260 DIPs.
+- [ ] Not in alt-tab or taskbar — **manual: to verify**: Alt+Tab while the spike runs.
+- [ ] Typing focus never stolen, including at launch — **observed**: launched from a terminal three times; the terminal kept focus and subsequent commands ran. **manual: to verify** with a text editor focused at launch.
+- [ ] Stays above a maximised browser and File Explorer — **manual: to verify**: maximise Edge and Explorer; the rectangle must stay visible over them (topmost re-asserted every 4 s).
+- [ ] `Ctrl+Alt+Shift+K` quits from any foreground app — **manual: to verify** for the spike (verified via `SendKeys` on the App, same interop code).
+- [ ] Sustained CPU below 2 % of total over 5 minutes at 260 DIPs tall — **observed (20 s, indicative)**: `REPORT: average cpu 0.09% of total over 20s`, steady-state samples 0.04 % at ~32 fps on a 2560-DIP-wide strip. Note the process-side number excludes DWM composition cost. **manual: to verify** for 5 minutes: `--exit-after 300 --report`, and watch Task Manager → Details → `Cowpanion.Spike.exe` and `dwm.exe`.
+- [ ] No memory growth over 5 minutes — **observed (20 s)**: working set 101 → 102 → 102 MB. **manual: to verify** over 5 minutes from the 5 s samples.
+
+## P1 — One cow
+
+- [ ] Feet on the ground line at scale 2, 3 and 4 — **observed at scale 3** (screenshot: feet at the strip bottom, 6 DIPs above the work-area edge). **manual: to verify** at 2 and 4: edit `"scale"` in config.json (hot-reloads) and look for floating/sinking.
+- [ ] Pixel art crisp at every integer scale — **observed at scale 3**: hard pixel edges in the screenshot (`NearestNeighbor` + `EdgeMode.Aliased`, integer scale only). **manual: to verify** at other scales and at 125 %/150 % DPI.
+- [ ] Walk cycle reads correctly in both directions after the flip — **manual: to verify**: watch a cow walk right (flipped via `ScaleTransform ScaleX=-1`) and left (native).
+- [ ] Turning at bounds doesn't snap — **automated: pass** (`HerdSimulatorTests.Turn_state_precedes_every_facing_flip`: every facing change is preceded by a 0.45 s `Turn` state). **manual: to verify** visually.
+- [ ] Stays in bounds — **automated: pass** (`Cows_stay_inside_bounds_for_ten_minutes`).
+- [ ] States change over time — **automated: pass** (`States_change_over_time`).
+- [ ] Fixed seed reproduces identically — **automated: pass** (`Fixed_seed_reproduces_identically`, `Different_seeds_differ`).
+- [ ] All P0 criteria still pass — see P0.
+- [ ] Manifest: missing animation falls back to idle; missing idle fatal naming the path — **automated: pass** (`SpriteManifestTests.Missing_animation_falls_back_to_idle`, `Missing_idle_is_fatal_and_names_the_path`, `Invalid_json_is_fatal_with_path`, `Real_manifest_in_repo_parses_and_covers_all_states`).
+
+## P2 — The herd
+
+- [ ] Six cows never visually overlap — **automated: pass** (`Six_cows_never_visually_overlap`: 10 simulated minutes, centre gap ≥ cow width every tick). **observed**: six cows, no overlap in two screenshots.
+- [ ] Cows sometimes cluster, sometimes spread — **automated: pass** (`Cows_both_cluster_and_spread_over_time`: spread varies by > 300 DIPs over 20 simulated minutes).
+- [ ] Editing `offlineHerdSize` takes effect within ~1 s — **automated: pass** for the mechanism (`ConfigTests.External_edit_raises_Changed_after_debounce_but_own_save_does_not`). **manual: to verify** end-to-end: edit config.json in Notepad, save; new cows walk in / surplus cows walk out within about a second.
+- [ ] Correct placement and scale on a second monitor with different DPI — **manual: to verify**: set `"monitors": "all"`, confirm each strip hugs its own taskbar and cows are the same physical-ish size. (`MonitorInfo` uses `GetDpiForMonitor`; `OverlayWindow.Place` uses physical pixels.) Only one monitor was available here.
+- [ ] Re-placement after resolution change, DPI change, monitor unplug — **manual: to verify**: change resolution / scaling / unplug; strips rebuild ~1 s after `DisplaySettingsChanged` (cows keep their simulator per device name).
+- [ ] CPU below 3 % with six cows; lower when idle — **observed (5 s sample, six cows, indicative)**: 0.10 % of total, working set 127 MB. **manual: to verify** in Task Manager over minutes; idle FPS drops to 5 when all cows are still and no bubbles show (`Orchestrator.ChooseFps`).
+- [ ] No memory growth over 1 hour — **manual: to verify**: run for an hour and compare the working set in Task Manager at 0, 30 and 60 min. Tick path is allocation-free by construction (`HerdSimulatorTests.Tick_does_not_allocate_in_steady_state` asserts 0 bytes over 3000 ticks).
+- [ ] Config clamping and bad-file backup — **automated: pass** (`Invalid_values_are_clamped_not_fatal`, `Malformed_file_is_backed_up_and_replaced`, `Unknown_properties_are_ignored_and_known_ones_kept`).
+- [ ] Personality identical for the same MemberId across simulator instances — **automated: pass** (`Personality_is_identical_for_the_same_member_across_simulators`).
+- [ ] Sleep only after the idle period — **automated: pass** (`Sleep_is_only_reachable_after_the_idle_period`).
+
+## P3 — Multiplayer
+
+- [ ] Two clients in one pasture show two cows; a third makes three — **manual: to verify** (needs server S2 + two machines/VMs). Mechanism: **automated: pass** (`PastureClientTests.Welcome_presence_and_chat_raise_events`; `HerdSimulatorTests.SyncMembers_walks_new_members_in_and_departed_members_out_without_teleporting`).
+- [ ] Closing one client removes its cow within 60 s, walking out — **manual: to verify**. Mechanism: **automated: pass** (`SyncMembers_walks_…`, `Member_rejoining_while_leaving_turns_back`; `Dispose_sends_bye_and_closes_cleanly` proves the courtesy `bye`).
+- [ ] A message typed on one client appears on all clients incl. the sender — **manual: to verify**. Own bubble is rendered only from the server echo (`ChatInputHost` never draws locally; `Orchestrator.OnChat` handles the relay). Sending: **automated: pass** (`Chat_is_sent_as_a_chat_frame_and_refused_when_disconnected`).
+- [ ] Server stopped mid-session: cows keep grazing, filler fallback, no dialog, no freeze, no CPU spike; restart re-syncs — **observed**: unreachable server → filler herd, jittered exponential backoff, clean run. Fallback to fillers happens after a 20 s grace (`Orchestrator.FallbackGrace`) so blips don't churn the herd. **automated: pass** (`Backoff_doubles_from_2s_to_60s_with_jitter_within_25_percent`, `Backoff_resets_after_a_welcomed_session`). **manual: to verify** with the real server.
+- [ ] Sleep/resume and Wi-Fi off/on recover — **automated: pass** for the detection mechanism (`Silent_server_is_detected_via_receive_timeout`: 75 s without frames aborts the socket and backs off). **manual: to verify** on hardware.
+- [ ] Interaction mode restores click-through after Enter, Esc, timeout and a thrown exception — **observed**: Esc path and injected-exception path (see hard rules). Enter and 8 s timeout paths share `Disarm()`. **manual: to verify** all four: Ctrl+Alt+C then (a) Enter, (b) Esc, (c) wait 8 s, (d) launch with `--inject-chat-exception` and press Ctrl+Alt+C; after each, click through the strip onto the desktop.
+- [ ] `Ctrl+Alt+M` hides bubbles instantly and survives restart — **observed**: setting persisted to config.json. **manual: to verify** that visible bubbles vanish instantly (`Orchestrator.ApplyConfig` calls `BubbleRenderer.ClearAll`).
+- [ ] 140-char message with emoji renders inside the bubble — **automated: pass** for the text layout (`BubbleTextTests.Max_length_message_with_emoji_fits_two_lines`, `Emoji_are_never_split`). **manual: to verify** glyph rendering (font stack `Segoe UI, Segoe UI Emoji`).
+- [ ] 4 clients at the rate limit for 2 minutes: no pileup, CPU under 4 % — **manual: to verify** (needs server). Design: one bubble per cow, per-cow queue capped at 8, global max 4 visible, oldest fades early.
+- [ ] Same friend's cow has identical personality across sessions and machines — **automated: pass** (`Personality_is_identical_for_the_same_member_across_simulators`; FNV-1a of the member id, no per-process hashing).
+- [ ] All P0 hard rules pass while connected — **manual: to verify** with the server.
+- [ ] Protocol conformance: hello first and well-formed — **automated: pass** (`Hello_is_the_first_frame_and_well_formed`, `MessageCodecTests.Hello_has_exactly_the_specified_fields`). Ping every 20 s — **automated: pass** (`Ping_is_sent_every_20_seconds_of_clock_time`). 4000/4003 terminal — **automated: pass** (`Terminal_close_codes_stop_reconnecting`, both codes). 4001/4002 long backoff — **automated: pass** (`Pasture_full_and_abuse_use_the_long_backoff`). Unknown `t` ignored, oversized/malformed frames survive — **automated: pass** (`Unknown_types_and_garbage_are_ignored_and_the_session_survives`, `MessageCodecTests.Malformed_frames_decode_to_null_without_throwing`).
+
+## P4 — Good citizen
+
+- [ ] No cows and no measurable CPU during a fullscreen game or PowerPoint; own cow stays visible to others — **manual: to verify**: start a fullscreen game or a slideshow; within 2 s the strip hides and the tick stops (`Orchestrator.OnFullscreenPoll`, `SHQueryUserNotificationState` states 3/4); the socket keeps pinging. Ask a friend whether your cow stayed.
+- [ ] Cows react to a nearby cursor without intercepting a click — **manual: to verify**: hover near a cow; idle cows turn to face the cursor, occasionally follow or spook. Click at the same time; the click lands underneath (cursor is read via `GetCursorPos`, never via mouse events).
+- [ ] Toggling `startWithWindows` twice leaves the registry as it started — **manual: to verify**: note `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, set true then false in config.json, compare (`Interop/StartupRegistration.cs` writes/deletes exactly the `Cowpanion` value).
+- [ ] Fresh install on a clean machine: launch → cows → connected pasture, no console, no crash — **observed** on this machine with a fresh scratch config: launched, cows rendered, no console window (`WinExe`), exit 0; publish to `publish/` succeeded (single-file self-contained, 140 MB). **manual: to verify** on a clean machine with the server up; the first-run name dialog appears there (skipped here via `--exit-after`).
+- [ ] 8-hour soak with multiplayer: flat memory, no socket leak — **manual: to verify**. One `ClientWebSocket` per attempt, disposed in a `finally` (`PastureClient.RunAsync`).
+- [ ] `PRIVACY.md` next to the binary — **observed**: present in `bin/Release/.../` and in `publish/`.
+- [ ] Optional moo, muted by default — **observed** by code: `MooPlayer` is a no-op without `assets/audio/moo.wav`; none is shipped (TODO in the file).
+
+---
+
+## How I launched things (for reproducibility)
+
+```powershell
+# spike, 20 s, CPU report
+spike\Cowpanion.Spike\bin\Release\net10.0-windows\win-x64\Cowpanion.Spike.exe --exit-after 20 --report
+# app, offline, scratch config, 12 s
+src\Cowpanion.App\bin\Release\net10.0-windows\win-x64\Cowpanion.exe --exit-after 12 --config <scratch>\config.json
+# app, hotkeys driven with System.Windows.Forms.SendKeys: ^%c (twice), {ESC}, ^%m, ^%+k
+```
+
+Every launch was followed by `Stop-Process -Name Cowpanion*` and no process was left running.

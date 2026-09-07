@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WFO0003: the WinForms analyzer wants DPI mode set in code, but this is a WPF app and WPF takes PerMonitorV2
+         from the manifest (plan P-1). WinForms is only used for Screen/NotifyIcon. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+    <AssemblyName>Cowpanion</AssemblyName>
+    <RootNamespace>Cowpanion.App</RootNamespace>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cowpanion.Core\Cowpanion.Core.csproj" />
+    <ProjectReference Include="..\Cowpanion.Net\Cowpanion.Net.csproj" />
+  </ItemGroup>
+
+  <!-- Sprite pack: linked from client/assets (single source of truth), copied to output as assets/sprites/cow/. -->
+  <ItemGroup>
+    <None Include="..\..\assets\sprites\cow\**" Link="assets\sprites\cow\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="PRIVACY.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- WinForms is used only for Screen and NotifyIcon; keep its namespace out of implicit usings so WPF types win. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+</Project>

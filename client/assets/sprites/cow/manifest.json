@@ -1,0 +1,27 @@
+{
+  "name": "cow",
+  "frameWidth": 32,
+  "frameHeight": 32,
+  "defaultScale": 3,
+  "facing": "left",
+  "anchor": "bottom-center",
+  "defaultVariant": "brown",
+  "sheets": {
+    "black0": "cows_spritesheet_black0.png",
+    "black1": "cows_spritesheet_black1.png",
+    "brown": "cows_spritesheet_brown.png",
+    "white0": "cows_spritesheet_white0.png",
+    "white1": "cows_spritesheet_white1.png",
+    "white_darkspots": "cows_spritesheet_white_darkspots.png",
+    "white_pinkspots": "cows_spritesheet_white_pinkspots.png"
+  },
+  "animations": {
+    "idle":  { "row": 0, "frames": 3, "fps": 3, "loop": true },
+    "graze": { "row": 1, "frames": 2, "fps": 2, "loop": true },
+    "idle2": { "row": 2, "frames": 4, "fps": 4, "loop": true },
+    "moo":   { "row": 3, "frames": 4, "fps": 4, "loop": false },
+    "walk":  { "row": 4, "frames": 4, "fps": 8, "loop": true },
+    "lie":   { "row": 5, "frames": 4, "fps": 3, "loop": true },
+    "sleep": { "row": 6, "frames": 4, "fps": 2, "loop": true }
+  }
+}

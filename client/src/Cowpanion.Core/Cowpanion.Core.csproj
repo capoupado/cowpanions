@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Simulation core. No UI, no network, no package references: BCL only. Enforced by review and by the
+       absence of any PackageReference/FrameworkReference below. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Cowpanion.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>

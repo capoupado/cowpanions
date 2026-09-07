@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Pasture WebSocket client. References Core only; no UI types, no Dispatcher. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Cowpanion.Net</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cowpanion.Core\Cowpanion.Core.csproj" />
+  </ItemGroup>
+
+</Project>
