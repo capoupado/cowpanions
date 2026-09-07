@@ -15,6 +15,14 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        var options = StartupOptions.Parse(e.Args);
+        if (options.DumpEmojiPath is not null)
+        {
+            // Dev aid, runs before the single-instance mutex so it works while the real client is up.
+            Shutdown(EmojiDump.Run(options.DumpEmojiPath));
+            return;
+        }
+
         // Single instance: a second launch exits silently.
         if (!TryAcquireMutex())
         {
@@ -23,7 +31,6 @@ public partial class App : Application
         }
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
-        var options = StartupOptions.Parse(e.Args);
         _orchestrator = new Orchestrator(this, options);
         try
         {

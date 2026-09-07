@@ -129,7 +129,7 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
 - [ ] **Reactions** — emoji-only input (1–3 emoji, spaces allowed; more are cut to three) and `/heart` `/love` `/lol`
   `/wave` `/party` `/wow` `/sad` send a `reaction`; receivers spawn 4–6 emoji rising ~90 DIPs from the cow's head over
   2.2 s with a sine sway, growing 0.8→1.1 and fading in the last 0.6 s (`Overlay/ReactionRenderer.cs`, pooled
-  TextBlocks, global cap 40). No bubble. **automated: pass** — `ChatComposerTests.Emoji_only_input_is_a_reaction`,
+  Image glyphs, global cap 40). No bubble. **automated: pass** — `ChatComposerTests.Emoji_only_input_is_a_reaction`,
   `Slash_reaction_commands_expand_case_insensitively`, `More_than_three_emoji_are_truncated_to_three`,
   `Everything_else_is_plain_text`; `MessageCodecTests.Chat_v2_server_frames_decode_with_optional_fields`.
   **manual: to verify** — type `❤️` and Enter: floating hearts over your cow on every screen; `/party gg` shows both a
@@ -138,6 +138,11 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   focus change (`Orchestrator.SendHeart`; registered after the kill hotkey). Logs `heart not sent: not connected`
   offline. **manual: to verify** — while typing in another app press Ctrl+Alt+H: hearts over your cow, focus
   unchanged, no keystroke lost. Same via the tray item.
+- [ ] **Reactions render in colour** — glyphs are Direct2D/DirectWrite bitmaps (`Overlay/EmojiRasterizer.cs`,
+  `DrawTextOptions.EnableColorFont`, cached per emoji and pixel size, 22 DIPs at the monitor's DPI scale) because WPF
+  text draws Segoe UI Emoji as black outlines; a rasteriser failure logs once and falls back to the TextBlock path.
+  **observed** — `Cowpanion.exe --dump-emoji out.png` (runs before the single-instance mutex) produced a red heart,
+  yellow 😂, 🎉 and a medium-skin-tone 👍🏽; 🇵🇹 shows as "PT" because Windows ships no flag glyphs.
 - [ ] **Chat-mode label** — the amber label now reads "Chat mode - Enter sends, Esc cancels, 8 s idle closes.
   /moo /jump /spin = emote, emoji-only = reaction". **manual: to verify** — Ctrl+Alt+C and read it; still one line on
   a 1080p-wide strip.

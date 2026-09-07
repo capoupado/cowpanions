@@ -32,6 +32,7 @@ internal sealed class Orchestrator : IDisposable
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly List<Strip> _strips = new();
     private readonly Dictionary<string, HerdSimulator> _simulatorsByDevice = new(StringComparer.Ordinal);
+    private readonly EmojiRasterizer _emoji = new();
     private readonly DispatcherTimer _tick;
     private readonly DispatcherTimer _topmost;
     private readonly DispatcherTimer _fullscreen;
@@ -207,7 +208,7 @@ internal sealed class Orchestrator : IDisposable
             var herd = new HerdRenderer(window.HerdCanvas, _sprites, _config.Scale, OverlayWindow.StripHeightDips - GroundInsetDips);
             var bubbles = new BubbleRenderer(window.BubbleCanvas, herd);
             var hoverLabel = new HoverLabelRenderer(window.BubbleCanvas, herd);
-            var reactions = new ReactionRenderer(window.BubbleCanvas, herd);
+            var reactions = new ReactionRenderer(window.BubbleCanvas, herd, _emoji, monitor.Scale);
             var simRef = sim;
             var chat = new ChatInputHost(window, herd, () => simRef, SendChatAsync, AppLog.Info);
             chat.StateChanged += () => ApplyFps(ChooseFps());
@@ -875,6 +876,7 @@ internal sealed class Orchestrator : IDisposable
         _tray?.Dispose();
         _hotkeys?.Dispose();
         _store?.Dispose();
+        _emoji.Dispose();
         AppLog.Info("---- Cowpanion stopped ----");
     }
 }

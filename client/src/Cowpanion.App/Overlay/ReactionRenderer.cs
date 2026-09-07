@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Cowpanion.Core.Simulation;
 using Cowpanion.Net;
 
@@ -8,7 +9,9 @@ namespace Cowpanion.App.Overlay;
 
 /// <summary>
 /// Floating emoji reactions: a small burst of glyphs rises from the cow's head, sways, grows slightly and fades.
-/// TextBlocks are pooled so the steady-state tick allocates nothing; at most <see cref="MaxLive"/> glyphs live at once.
+/// Each glyph is an Image showing a colour bitmap from <see cref="EmojiRasterizer"/> (WPF text cannot draw colour
+/// emoji); when the rasteriser is unavailable the glyph falls back to a TextBlock. Elements are pooled and bitmaps come
+/// from the rasteriser's cache, so the steady-state tick allocates nothing; at most <see cref="MaxLive"/> glyphs live at once.
 /// </summary>
 internal sealed class ReactionRenderer
 {
@@ -21,11 +24,15 @@ internal sealed class ReactionRenderer
     private const double JitterDips = 18;
     private const double ScaleFrom = 0.8;
     private const double ScaleTo = 1.1;
+    private const double GlyphDips = 22;
 
     private static readonly FontFamily Font = new("Segoe UI Emoji, Segoe UI Symbol");
 
     private sealed class Glyph
     {
+        /// <summary>The element on the canvas: the Image normally, the TextBlock when falling back.</summary>
+        public required FrameworkElement Element;
+        public required Image Image;
         public required TextBlock Text;
         public required ScaleTransform Scale;
         public required TranslateTransform Move;
@@ -39,14 +46,19 @@ internal sealed class ReactionRenderer
 
     private readonly Canvas _canvas;
     private readonly HerdRenderer _herd;
+    private readonly EmojiRasterizer _emoji;
+    private readonly double _dpiScale;
     private readonly Random _rng = new();
     private readonly List<Glyph> _live = new();
     private readonly Stack<Glyph> _pool = new();
 
-    public ReactionRenderer(Canvas canvas, HerdRenderer herd)
+    /// <param name="dpiScale">The monitor's DPI scale; bitmaps are rendered at GlyphDips x scale pixels so they stay crisp.</param>
+    public ReactionRenderer(Canvas canvas, HerdRenderer herd, EmojiRasterizer emoji, double dpiScale)
     {
         _canvas = canvas;
         _herd = herd;
+        _emoji = emoji;
+        _dpiScale = dpiScale;
     }
 
     public bool AnyActive => _live.Count > 0;
@@ -71,14 +83,11 @@ internal sealed class ReactionRenderer
             g.Age = -StaggerSeconds * i;
             g.Jitter = (_rng.NextDouble() * 2 - 1) * JitterDips;
             g.Phase = _rng.NextDouble() * Math.PI * 2;
-            g.Text.Text = clusters[i % clusters.Count];
-            g.Text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            g.Width = g.Text.DesiredSize.Width;
-            g.Height = g.Text.DesiredSize.Height;
+            Show(g, clusters[i % clusters.Count]);
             g.Scale.CenterX = g.Width / 2;
             g.Scale.CenterY = g.Height / 2;
-            g.Text.Opacity = 0;
-            g.Text.Visibility = Visibility.Visible;
+            g.Element.Opacity = 0;
+            g.Element.Visibility = Visibility.Visible;
             _live.Add(g);
         }
     }
@@ -97,9 +106,9 @@ internal sealed class ReactionRenderer
             if (g.Age < 0)
             {
                 // Still waiting for its stagger slot.
-                if (g.Text.Opacity != 0)
+                if (g.Element.Opacity != 0)
                 {
-                    g.Text.Opacity = 0;
+                    g.Element.Opacity = 0;
                 }
                 continue;
             }
@@ -123,8 +132,33 @@ internal sealed class ReactionRenderer
             g.Move.Y = Math.Round(y);
             g.Scale.ScaleX = scale;
             g.Scale.ScaleY = scale;
-            g.Text.Opacity = Math.Clamp(opacity, 0, 1);
+            g.Element.Opacity = Math.Clamp(opacity, 0, 1);
         }
+    }
+
+    /// <summary>Puts the emoji on the glyph: colour bitmap in the Image when the rasteriser has one, else text in the TextBlock.</summary>
+    private void Show(Glyph g, string emoji)
+    {
+        BitmapSource? bitmap = _emoji.Render(emoji, GlyphDips, _dpiScale);
+        if (bitmap is not null)
+        {
+            g.Image.Source = bitmap;
+            // The bitmap was rendered at GlyphDips x scale pixels; pin the DIP size so layout never rounds it.
+            g.Width = bitmap.PixelWidth / _dpiScale;
+            g.Height = bitmap.PixelHeight / _dpiScale;
+            g.Image.Width = g.Width;
+            g.Image.Height = g.Height;
+            g.Text.Visibility = Visibility.Collapsed;
+            g.Element = g.Image;
+            return;
+        }
+        g.Image.Source = null;
+        g.Image.Visibility = Visibility.Collapsed;
+        g.Text.Text = emoji;
+        g.Text.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        g.Width = g.Text.DesiredSize.Width;
+        g.Height = g.Text.DesiredSize.Height;
+        g.Element = g.Text;
     }
 
     public void ClearAll()
@@ -146,17 +180,30 @@ internal sealed class ReactionRenderer
         var group = new TransformGroup();
         group.Children.Add(scale);
         group.Children.Add(move);
-        var text = new TextBlock
+        // Both elements share the transforms; only one is visible at a time (see Show).
+        var image = new Image
         {
-            FontFamily = Font,
-            FontSize = 18,
+            Stretch = Stretch.Fill,
             IsHitTestVisible = false,
             RenderTransform = group,
             Opacity = 0,
+            Visibility = Visibility.Collapsed,
+        };
+        RenderOptions.SetBitmapScalingMode(image, BitmapScalingMode.HighQuality);
+        Panel.SetZIndex(image, 400);
+        _canvas.Children.Add(image);
+        var text = new TextBlock
+        {
+            FontFamily = Font,
+            FontSize = GlyphDips,
+            IsHitTestVisible = false,
+            RenderTransform = group,
+            Opacity = 0,
+            Visibility = Visibility.Collapsed,
         };
         Panel.SetZIndex(text, 400);
         _canvas.Children.Add(text);
-        return new Glyph { Text = text, Scale = scale, Move = move };
+        return new Glyph { Element = image, Image = image, Text = text, Scale = scale, Move = move };
     }
 
     private void Return(int index)
@@ -164,7 +211,8 @@ internal sealed class ReactionRenderer
         var g = _live[index];
         _live.RemoveAt(index);
         g.Cow = null;
-        g.Text.Opacity = 0;
+        g.Element.Opacity = 0;
+        g.Image.Visibility = Visibility.Collapsed;
         g.Text.Visibility = Visibility.Collapsed;
         _pool.Push(g);
     }

@@ -14,11 +14,18 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- EmojiRasterizer copies WIC pixels through a fixed pointer. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Cowpanion.Core\Cowpanion.Core.csproj" />
     <ProjectReference Include="..\Cowpanion.Net\Cowpanion.Net.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Direct2D/DirectWrite for colour emoji (EmojiRasterizer): WPF's text stack cannot draw COLR/CPAL fonts. -->
+    <PackageReference Include="Vortice.Direct2D1" Version="3.8.3" />
   </ItemGroup>
 
   <!-- Sprite pack: linked from client/assets (single source of truth), copied to output as assets/sprites/cow/. -->

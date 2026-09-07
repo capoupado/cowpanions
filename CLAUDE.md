@@ -41,7 +41,7 @@ cd client; dotnet build Cowpanion.sln -c Release      # must be 0 warnings (Trea
 dotnet test Cowpanion.sln -c Release                  # Core 44, Net 18 (Net takes ~35 s by design)
 dotnet publish src/Cowpanion.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true `
   -p:IncludeNativeLibrariesForSelfExtract=true -p:BaseOutputPath=bin-publish/ -o ../dist/Cowpanion-win-x64
-# Dev flags for the app: --exit-after N  --config PATH  --no-dialog  --inject-chat-exception
+# Dev flags for the app: --exit-after N  --config PATH  --no-dialog  --inject-chat-exception  --dump-emoji PATH
 
 # deploy (on the VPS, as root): pulls, npm ci, installs unit + nginx site + static site, restarts
 bash /opt/cowpanion/server/deploy/install.sh
@@ -75,6 +75,10 @@ hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
 - wscat clients get evicted after 60 s because they never send `{"t":"ping"}`. Real clients ping
   every 20 s. Not a bug.
 - Line endings: repo has `.gitattributes` (`* text=auto`); the CRLF warnings on commit are noise.
+- WPF cannot draw colour emoji (no COLR/CPAL in its text stack; Segoe UI Emoji comes out as black
+  outlines). `Overlay/EmojiRasterizer.cs` (Direct2D via `Vortice.Direct2D1`, `EnableColorFont`) is
+  the path; `Cowpanion.exe --dump-emoji out.png` proves it without a display and runs before the
+  mutex, so it works while the real client is up. Windows has no flag glyphs: 🇵🇹 renders as "PT".
 
 ## Ways of working with Carlos
 
