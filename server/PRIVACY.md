@@ -22,9 +22,9 @@ All of this disappears when you disconnect or the server restarts.
 | Chat text | **nowhere** — never written, at any log level | — |
 | Ban list | `data/bans.sqlite` | until unbanned; stores **SHA-256(clientId)** only — no IP, no name |
 | Server log (journald) | `join`/`leave`/`chat` events with pasture, clientId, display name, message **byte count**, and the client IP **truncated** to /24 (IPv4) or /48 (IPv6) | system journal default |
-| Web-server access log (Apache) | request line, status, timestamp, **full client IP** | rotated daily, **deleted after 7 days** |
+| Web-server access log (nginx) | request line, status, timestamp, **full client IP** | rotated daily, **deleted after 7 days** |
 
-The Apache access log is the only place a full IP address exists, and it is the reason for the
+The nginx access log is the only place a full IP address exists, and it is the reason for the
 7-day rule: chat text plus an IP address would be personal data under GDPR, so the server is
 built so those two facts are never in the same place.
 

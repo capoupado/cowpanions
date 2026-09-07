@@ -1,0 +1,23 @@
+# Cowpanion site logs: the protocol's privacy rules cap IP retention at 7 days.
+# Installed to /etc/logrotate.d/nginx-cows. Lives in its own directory so it does
+# not collide with Debian's /etc/logrotate.d/nginx glob (/var/log/nginx/*.log).
+#
+# daily + rotate 6 = the live file (< 1 day) plus six dated files = 7 days maximum.
+# maxage 7 removes anything older even if rotation was skipped for a while.
+/var/log/nginx/cows/*.log {
+    daily
+    rotate 6
+    maxage 7
+    missingok
+    notifempty
+    compress
+    delaycompress
+    dateext
+    create 640 www-data adm
+    sharedscripts
+    postrotate
+        if [ -f /run/nginx.pid ]; then
+            kill -USR1 "$(cat /run/nginx.pid)"
+        fi
+    endscript
+}

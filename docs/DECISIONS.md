@@ -114,3 +114,10 @@ Both tracks must follow them.
   self cow stays when presence arrives. `offlineHerdSize: 0` means no cows at all.
 - **Fillers get stable hashed colours** from the seven sheets (same colours every launch).
 - Still open: sleep trigger (user inactivity vs herd stillness), no `moo.wav`.
+
+## Reverse proxy is nginx, not Apache (2026-09-07)
+
+The VPS runs nginx. `server/deploy/` now ships `nginx-cows.conf` (https site with the `/ws`
+proxy, `proxy_read_timeout 300s`, HSTS, own logs under `/var/log/nginx/cows/`), an http-only
+`nginx-cows-bootstrap.conf` used until certbot has produced the certificate, and
+`logrotate-nginx-cows`. The server plan document still says Apache; this file supersedes it.

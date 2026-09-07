@@ -3,7 +3,7 @@
 Every criterion from `docs/cowpanion-server-plan.md` S0–S3. Test names refer to
 `server/test/protocol.test.js` and `server/test/server.test.js`; `npm test` on Windows /
 Node 24.16 ran them (30 pass, 1 skipped) on 2026-09-07. Nobody in this session has VPS access,
-so anything touching Apache, systemd, DNS, certbot or the public network is `manual: to verify`
+so anything touching nginx, systemd, DNS, certbot or the public network is `manual: to verify`
 with the command in `deploy/RUNBOOK.md` (section numbers below).
 
 Legend: `automated: pass (test)` · `manual: to verify (RUNBOOK §)` · `not verifiable here`.
@@ -14,7 +14,7 @@ Legend: `automated: pass (test)` · `manual: to verify (RUNBOOK §)` · `not ver
       not echo arbitrary frames; `ping`→`pong` is the echo. The Node side of it is
       **automated: pass** (`S1: pasture code lowercased… unknown message types ignored` covers ping/pong).
 - [ ] Connection survives 5 minutes fully idle — **manual: to verify** (RUNBOOK S0.2). Note: per
-      protocol the *server* evicts after 60s of silence, so the meaningful check is that Apache's
+      protocol the *server* evicts after 60s of silence, so the meaningful check is that nginx's
       `ProxyTimeout 300` does not cut a heart-beating client for 5+ minutes.
 - [ ] `systemctl restart cowpanion` recovers; status clean — **manual: to verify** (RUNBOOK S0.3).
 - [ ] Not reachable on :8787 from outside — **manual: to verify** (RUNBOOK S0.4). Bind to
@@ -50,14 +50,14 @@ Legend: `automated: pass (test)` · `manual: to verify (RUNBOOK §)` · `not ver
 
 - [x] Banned clientId cannot join; clean id can — **automated: pass** (`S3: banned clientId gets error+4003…`; also: ban applied while connected evicts at next sweep; unban re-admits). Hashing is SHA-256 in `src/bans.js`. CLI exercised by hand against a live server (ban/list/unban/usage error).
 - [ ] `systemctl stop` → 1001, exit < 5s, no orphan — **automated: pass** for the in-process shutdown path (`S3: shutdown closes every client with 1001 and completes within 5s`). The real-signal test (`S3: real process handles SIGTERM…`) is **skipped on Windows** (no SIGTERM handlers) and WSL has no Node, so it did not run here — **manual: to verify** (RUNBOOK S3.2).
-- [ ] Apache access logs older than 7 days gone — **manual: to verify** (RUNBOOK S3.3). Config: `deploy/logrotate-apache-cows` (`daily`, `rotate 6`, `maxage 7`).
+- [ ] nginx access logs older than 7 days gone — **manual: to verify** (RUNBOOK S3.3). Config: `deploy/logrotate-nginx-cows` (`daily`, `rotate 6`, `maxage 7`).
 - [ ] 200 rapid connection attempts throttled; existing members unaffected — per-IP cap (HTTP 429 on the 5th concurrent connection, XFF-aware) is **automated: pass** (`S3: per-IP connection cap…`). fail2ban deliberately not installed (owner decision 2026-09-07); the per-IP cap is the only throttle. **manual: to verify** on the VPS per RUNBOOK S3.4.
 - [ ] 24-hour soak, flat memory, no fd leak, no unhandled rejections — **manual: to verify** (RUNBOOK S3.5). **not verifiable here**.
 - [ ] `/healthz` unreachable from outside — **manual: to verify** (RUNBOOK S3.6). Localhost `/healthz` with uptime/pastures/members and 404 elsewhere is **automated: pass** (`S3: /healthz reports counts…`).
 - [x] Structured JSON logs, IPs truncated /24 and /48 — **automated: pass** (`S3: IPs are truncated to /24 and /48`; `S3: per-IP connection cap…` asserts the full IP never appears).
 - [x] `npm audit` clean, deps pinned, lockfile committed — **automated: pass** (`npm audit`: 0 vulnerabilities; `ws` pinned `8.21.3`; `package-lock.json` present).
 - [x] `PRIVACY.md` — written (`server/PRIVACY.md`). Shipping it with the client is the client track's job.
-- [ ] X-Forwarded-For actually arrives from Apache (not a plan criterion, but the per-IP cap depends on it) — **manual: to verify** (RUNBOOK S3.4b).
+- [ ] X-Forwarded-For actually arrives from nginx (not a plan criterion, but the per-IP cap depends on it) — **manual: to verify** (RUNBOOK S3.4b).
 
 ## Decisions where the plan left room
 

@@ -7,7 +7,7 @@ Everything here runs on the VPS as root (or with `sudo`) unless it says "from yo
 ## 0. Prerequisites on the VPS
 
 ```bash
-apt update && apt install -y git apache2 certbot
+apt update && apt install -y git nginx certbot
 # Node.js >= 22 (Debian's packaged node is too old). NodeSource 22 LTS:
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
 node -v   # must print v22.13 or newer (v22.5–22.12 need --experimental-sqlite, see the unit file)
@@ -30,21 +30,21 @@ sudo bash /tmp/cowpanion-bootstrap/server/deploy/install.sh
 ```
 
 The script is idempotent. It creates the user, clones to `/opt/cowpanion`, runs
-`npm ci --omit=dev`, installs the systemd unit, Apache vhost and logrotate rule,
-enables the Apache modules and starts the service. The `:443` vhost stays dormant until the
-certificate exists.
+`npm ci --omit=dev`, installs the systemd unit, nginx site and logrotate rule, enables the site and starts the
+service. Until the certificate exists it installs an http-only bootstrap site (ACME challenge +
+redirect); re-running the script after certbot swaps in the https site.
 
 ## 3. TLS certificate
 
 ```bash
 certbot certonly --webroot -w /var/www/html -d cows.carlospoupado.com \
-    --deploy-hook "systemctl reload apache2"
-systemctl reload apache2
+    --deploy-hook "systemctl reload nginx"
+sudo bash /opt/cowpanion/server/deploy/install.sh   # installs the https site now that the cert exists
 certbot renew --dry-run
 ```
 
-`certonly --webroot` does not touch the vhost. If you prefer `certbot --apache`, it will edit
-`/etc/apache2/sites-available/cows.conf` (or add a `cows-le-ssl.conf`); keep the proxy block.
+`certonly --webroot` does not touch the site file. If you prefer `certbot --nginx`, it will edit
+`/etc/nginx/sites-available/cows` in place; keep the `/ws` location block.
 
 ## 4. Redeploy (after every server change)
 
@@ -113,7 +113,7 @@ connection before the server does, i.e. `ProxyTimeout 300` is honoured:
 ```powershell
 npx wscat -c wss://cows.carlospoupado.com/ws   # send hello, then send NOTHING
 # Expect the close after ~60–70s to carry code 1000 reason "idle" (server eviction).
-# A close after ~60s with code 1006 / no code means Apache cut it: check ProxyTimeout.
+# A close after ~60s with code 1006 / no code means nginx cut it: check proxy_read_timeout.
 ```
 And the positive check: with a hello followed by `{"t":"ping"}` every 20s (the client's real
 behaviour), the connection must stay up for 5+ minutes. Easiest with the desktop client running
@@ -161,7 +161,7 @@ itself in presence; a `chat` in one never appears in the other.
 
 **S1.5 25th member → 4001.** Scripted. 25 connections from one PC would trip the per-IP cap (4)
 first, so run this **on the VPS**, talking to the server directly with a distinct
-`X-Forwarded-For` per connection (the server trusts that header because only Apache can reach it):
+`X-Forwarded-For` per connection (the server trusts that header because only nginx can reach it):
 ```bash
 cd /opt/cowpanion/server && node -e "const {WebSocket}=require('ws');for(let i=1;i<=25;i++){const w=new WebSocket('ws://127.0.0.1:8787/ws',{headers:{'x-forwarded-for':'10.99.0.'+i}});w.on('open',()=>w.send(JSON.stringify({t:'hello',protocolVersion:1,clientId:i.toString(16).padStart(32,'0'),pasture:'cap-test',displayName:'m'+i})));w.on('close',c=>console.log(i,'closed',c));w.on('message',d=>{const m=JSON.parse(d);if(m.t==='presence'&&i===1)console.log('members',m.members.length,'overflow',m.overflow)})};setTimeout(()=>process.exit(0),8000)"
 ```
@@ -220,11 +220,11 @@ systemctl start cowpanion
 
 **S3.3 Access logs older than 7 days are gone.**
 ```bash
-logrotate -d /etc/logrotate.d/apache-cows         # dry run, no errors
-logrotate -f /etc/logrotate.d/apache-cows         # force one rotation
-ls -la /var/log/apache2/cows/                     # access.log + access.log-YYYYMMDD; never more than 6 dated files
+logrotate -d /etc/logrotate.d/nginx-cows         # dry run, no errors
+logrotate -f /etc/logrotate.d/nginx-cows         # force one rotation
+ls -la /var/log/nginx/cows/                     # access.log + access.log-YYYYMMDD; never more than 6 dated files
 ```
-Re-check after a week: `find /var/log/apache2/cows -mtime +7` prints nothing.
+Re-check after a week: `find /var/log/nginx/cows -mtime +7` prints nothing.
 
 **S3.4 200 rapid connection attempts from one IP are throttled.** From your PC:
 ```powershell
@@ -234,9 +234,9 @@ Throttling is the per-IP cap in Node (fail2ban was deliberately not installed, o
 2026-09-07): a 5th concurrent connection from the same IP is refused with HTTP 429
 (`journalctl -u cowpanion | grep ip_cap`). A wscat client on a *different* network (e.g. phone
 hotspot) is unaffected. If you later want an IP-level ban layer, `apt install fail2ban` and add a
-jail on `/var/log/apache2/cows/access.log`.
+jail on `/var/log/nginx/cows/access.log`.
 
-**S3.4b X-Forwarded-For is being passed by Apache** (otherwise every client counts as 127.0.0.1
+**S3.4b X-Forwarded-For is being passed by nginx** (otherwise every client counts as 127.0.0.1
 and the cap of 4 applies to everyone together):
 ```bash
 journalctl -u cowpanion | grep '"event":"join"' | tail -3    # "ip" must be the client's /24, NOT "127.0.0.0/24"
@@ -251,7 +251,7 @@ Compare memory/fd counts at hour 1 and hour 24; they should be within noise.
 
 **S3.6 /healthz unreachable from outside.**
 ```powershell
-curl.exe -m 5 https://cows.carlospoupado.com/healthz     # expect 403 (Apache denies everything but /ws)
+curl.exe -m 5 https://cows.carlospoupado.com/healthz     # expect 403 (nginx denies everything but /ws)
 ```
 ```bash
 curl -s http://127.0.0.1:8787/healthz        # on the VPS: {"ok":true,"uptimeSec":..,"pastures":..,"members":..}
@@ -261,7 +261,7 @@ curl -s http://127.0.0.1:8787/healthz        # on the VPS: {"ok":true,"uptimeSec
 
 | Symptom | Check |
 | --- | --- |
-| clients reconnect every ~60s | `ProxyTimeout 300` present in the active vhost (`apache2ctl -S`, `apache2ctl -t -D DUMP_INCLUDES`) |
+| clients reconnect every ~60s | `proxy_read_timeout 300s` present in the active site (`nginx -T | grep -A3 'location = /ws'`) |
 | everyone gets 429 after 4 clients | S3.4b — X-Forwarded-For missing; `ProxyAddHeaders On` in the vhost |
 | `node:sqlite` error at start | Node < 22.13: add `--experimental-sqlite` to `ExecStart` |
 | `EACCES data/bans.sqlite` | `chown -R cowpanion:cowpanion /opt/cowpanion/server/data` |

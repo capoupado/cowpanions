@@ -9,8 +9,8 @@
 #   1. creates the unprivileged `cowpanion` system user
 #   2. clones or fast-forwards the monorepo at /opt/cowpanion
 #   3. npm ci --omit=dev inside /opt/cowpanion/server
-#   4. installs the systemd unit, Apache vhost and logrotate rule
-#   5. enables Apache modules + site, reloads Apache, enables and (re)starts the service
+#   4. installs the systemd unit, nginx site and logrotate rule
+#   5. enables the nginx site, reloads nginx, enables and (re)starts the service
 # It does NOT obtain the TLS certificate — see RUNBOOK.md for the certbot step.
 set -euo pipefail
 
@@ -30,7 +30,7 @@ die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 command -v git  >/dev/null || die "git is not installed"
 command -v node >/dev/null || die "node is not installed (need Node.js >= 22, see RUNBOOK.md)"
 command -v npm  >/dev/null || die "npm is not installed"
-command -v apache2ctl >/dev/null || die "apache2 is not installed"
+command -v nginx >/dev/null || die "nginx is not installed"
 
 NODE_MAJOR="$(node -v | sed -E 's/^v([0-9]+).*/\1/')"
 [ "$NODE_MAJOR" -ge 22 ] || die "Node.js $(node -v) is too old; need >= 22"
@@ -69,18 +69,22 @@ log "systemd unit"
 install -m 644 "$DEPLOY_DIR/cowpanion.service" /etc/systemd/system/cowpanion.service
 systemctl daemon-reload
 
-log "apache vhost"
-install -d -m 750 -o root -g adm /var/log/apache2/cows
+log "nginx site"
+install -d -m 750 -o www-data -g adm /var/log/nginx/cows
 install -d -m 755 /var/www/html
-install -m 644 "$DEPLOY_DIR/apache-cows.conf" /etc/apache2/sites-available/cows.conf
-a2enmod -q proxy proxy_http proxy_wstunnel rewrite headers ssl
-a2ensite -q cows.conf
-apache2ctl configtest
-systemctl reload apache2
+if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
+  install -m 644 "$DEPLOY_DIR/nginx-cows.conf" /etc/nginx/sites-available/cows
+else
+  warn "no certificate for $DOMAIN yet: installing the http-only bootstrap site (re-run after certbot)"
+  install -m 644 "$DEPLOY_DIR/nginx-cows-bootstrap.conf" /etc/nginx/sites-available/cows
+fi
+ln -sfn /etc/nginx/sites-available/cows /etc/nginx/sites-enabled/cows
+nginx -t
+systemctl reload nginx
 
-log "logrotate (7-day retention for the vhost access log)"
-install -m 644 "$DEPLOY_DIR/logrotate-apache-cows" /etc/logrotate.d/apache-cows
-logrotate -d /etc/logrotate.d/apache-cows >/dev/null 2>&1 || warn "logrotate dry run reported a problem: run 'logrotate -d /etc/logrotate.d/apache-cows'"
+log "logrotate (7-day retention for the site access log)"
+install -m 644 "$DEPLOY_DIR/logrotate-nginx-cows" /etc/logrotate.d/nginx-cows
+logrotate -d /etc/logrotate.d/nginx-cows >/dev/null 2>&1 || warn "logrotate dry run reported a problem: run 'logrotate -d /etc/logrotate.d/nginx-cows'"
 
 # 5. service ------------------------------------------------------------------
 log "service"
@@ -93,10 +97,10 @@ systemctl --no-pager --lines=5 status cowpanion || die "cowpanion failed to star
 if [ ! -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
   cat <<EOF
 
-No TLS certificate yet, so the :443 vhost is inactive. Once DNS for $DOMAIN points here:
+No TLS certificate yet, so only the http bootstrap site is active. Once DNS for $DOMAIN points here:
    apt install certbot
-   certbot certonly --webroot -w /var/www/html -d $DOMAIN --deploy-hook "systemctl reload apache2"
-   systemctl reload apache2
+   certbot certonly --webroot -w /var/www/html -d $DOMAIN --deploy-hook "systemctl reload nginx"
+   sudo bash $DEPLOY_DIR/install.sh      # swaps in the https site and reloads nginx
 EOF
 fi
 log "done — see $DEPLOY_DIR/RUNBOOK.md for verification steps"

@@ -67,7 +67,7 @@ export function createServer(overrides = {}) {
   }
 
   function clientIp(req) {
-    // Apache fronts us on localhost, so trust the first hop of X-Forwarded-For.
+    // nginx fronts us on localhost, so trust the first hop of X-Forwarded-For.
     const xff = req.headers['x-forwarded-for'];
     if (typeof xff === 'string' && xff.trim() !== '') return xff.split(',')[0].trim();
     return req.socket.remoteAddress ?? 'unknown';
