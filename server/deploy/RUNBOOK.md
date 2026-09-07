@@ -7,7 +7,7 @@ Everything here runs on the VPS as root (or with `sudo`) unless it says "from yo
 ## 0. Prerequisites on the VPS
 
 ```bash
-apt update && apt install -y git apache2 certbot fail2ban
+apt update && apt install -y git apache2 certbot
 # Node.js >= 22 (Debian's packaged node is too old). NodeSource 22 LTS:
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt install -y nodejs
 node -v   # must print v22.13 or newer (v22.5–22.12 need --experimental-sqlite, see the unit file)
@@ -25,12 +25,12 @@ Resolve-DnsName cows.carlospoupado.com      # or: nslookup cows.carlospoupado.co
 ## 2. Install (first time)
 
 ```bash
-git clone <repo> /tmp/cowpanion-bootstrap
-sudo COWPANION_REPO=<repo> bash /tmp/cowpanion-bootstrap/server/deploy/install.sh
+git clone https://github.com/capoupado/cowpanions.git /tmp/cowpanion-bootstrap
+sudo bash /tmp/cowpanion-bootstrap/server/deploy/install.sh
 ```
 
 The script is idempotent. It creates the user, clones to `/opt/cowpanion`, runs
-`npm ci --omit=dev`, installs the systemd unit, Apache vhost, logrotate rule and fail2ban jail,
+`npm ci --omit=dev`, installs the systemd unit, Apache vhost and logrotate rule,
 enables the Apache modules and starts the service. The `:443` vhost stays dormant until the
 certificate exists.
 
@@ -230,10 +230,11 @@ Re-check after a week: `find /var/log/apache2/cows -mtime +7` prints nothing.
 ```powershell
 1..200 | ForEach-Object { curl.exe -s -o NUL -m 3 -H "Upgrade: websocket" -H "Connection: Upgrade" -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" https://cows.carlospoupado.com/ws }
 ```
-On the VPS: `fail2ban-client status cowpanion` shows your IP banned (bantime 600s). A wscat client
-on a *different* network (e.g. phone hotspot) is unaffected. Unban with
-`fail2ban-client set cowpanion unbanip <your ip>`. Also check the per-IP cap: a 5th concurrent
-connection from the same IP is refused with HTTP 429 (`journalctl -u cowpanion | grep ip_cap`).
+Throttling is the per-IP cap in Node (fail2ban was deliberately not installed, owner decision
+2026-09-07): a 5th concurrent connection from the same IP is refused with HTTP 429
+(`journalctl -u cowpanion | grep ip_cap`). A wscat client on a *different* network (e.g. phone
+hotspot) is unaffected. If you later want an IP-level ban layer, `apt install fail2ban` and add a
+jail on `/var/log/apache2/cows/access.log`.
 
 **S3.4b X-Forwarded-For is being passed by Apache** (otherwise every client counts as 127.0.0.1
 and the cap of 4 applies to everyone together):

@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Cowpanion pasture server — idempotent install / deploy script for the Debian VPS.
 #
-# First install:   sudo COWPANION_REPO=<git url> bash install.sh
+# First install:   sudo bash install.sh            (clones https://github.com/capoupado/cowpanions.git)
+#                  override with COWPANION_REPO=<git url>
 # Redeploy:        sudo bash /opt/cowpanion/server/deploy/install.sh
 #
 # What it does (every step is safe to re-run):
 #   1. creates the unprivileged `cowpanion` system user
 #   2. clones or fast-forwards the monorepo at /opt/cowpanion
 #   3. npm ci --omit=dev inside /opt/cowpanion/server
-#   4. installs the systemd unit, Apache vhost, logrotate rule and fail2ban jail
+#   4. installs the systemd unit, Apache vhost and logrotate rule
 #   5. enables Apache modules + site, reloads Apache, enables and (re)starts the service
 # It does NOT obtain the TLS certificate — see RUNBOOK.md for the certbot step.
 set -euo pipefail
@@ -18,7 +19,7 @@ SERVER_DIR="$APP_DIR/server"
 DEPLOY_DIR="$SERVER_DIR/deploy"
 DOMAIN=cows.carlospoupado.com
 BRANCH="${COWPANION_BRANCH:-main}"
-REPO_URL="${COWPANION_REPO:-}"
+REPO_URL="${COWPANION_REPO:-https://github.com/capoupado/cowpanions.git}"
 SERVICE_USER=cowpanion
 
 log()  { printf '\n==> %s\n' "$*"; }
@@ -51,7 +52,6 @@ if [ -d "$APP_DIR/.git" ]; then
   git -C "$APP_DIR" checkout -q "$BRANCH"
   git -C "$APP_DIR" pull --ff-only origin "$BRANCH"
 else
-  [ -n "$REPO_URL" ] || die "no checkout at $APP_DIR; set COWPANION_REPO=<git url> for the first install"
   git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
 fi
 [ -f "$SERVER_DIR/package.json" ] || die "$SERVER_DIR/package.json missing — wrong repo or branch?"
@@ -81,14 +81,6 @@ systemctl reload apache2
 log "logrotate (7-day retention for the vhost access log)"
 install -m 644 "$DEPLOY_DIR/logrotate-apache-cows" /etc/logrotate.d/apache-cows
 logrotate -d /etc/logrotate.d/apache-cows >/dev/null 2>&1 || warn "logrotate dry run reported a problem: run 'logrotate -d /etc/logrotate.d/apache-cows'"
-
-if command -v fail2ban-client >/dev/null; then
-  log "fail2ban jail"
-  install -m 644 "$DEPLOY_DIR/fail2ban-cowpanion.conf" /etc/fail2ban/jail.d/cowpanion.conf
-  systemctl reload fail2ban || systemctl restart fail2ban
-else
-  warn "fail2ban is not installed; skipping the jail (apt install fail2ban, then re-run)"
-fi
 
 # 5. service ------------------------------------------------------------------
 log "service"
