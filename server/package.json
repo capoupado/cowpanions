@@ -1,0 +1,19 @@
+{
+  "name": "cowpanion-server",
+  "version": "1.0.0",
+  "description": "Cowpanion pasture server: presence + chat relay over WebSocket (protocol v1)",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "ban": "node bin/cowpanion-ban.js"
+  },
+  "dependencies": {
+    "ws": "8.21.3"
+  }
+}

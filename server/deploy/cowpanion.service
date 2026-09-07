@@ -1,0 +1,45 @@
+[Unit]
+Description=Cowpanion pasture server
+Documentation=file:///opt/cowpanion/server/deploy/RUNBOOK.md
+After=network.target
+
+[Service]
+Type=simple
+User=cowpanion
+Group=cowpanion
+WorkingDirectory=/opt/cowpanion/server
+# node:sqlite is unflagged from Node 22.13 / 23.4. On an older 22.x use:
+#   ExecStart=/usr/bin/node --experimental-sqlite src/server.js
+ExecStart=/usr/bin/node src/server.js
+Restart=always
+RestartSec=3
+# SIGTERM -> server broadcasts close 1001, drains up to 3s, exits. SIGKILL after 5s.
+KillSignal=SIGTERM
+TimeoutStopSec=5
+Environment=NODE_ENV=production
+Environment=COWPANION_PORT=8787
+Environment=COWPANION_DATA=/opt/cowpanion/server/data
+Environment=COWPANION_LOG_LEVEL=info
+Environment=COWPANION_IP_CAP=4
+
+# Hardening (plan) ...
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/cowpanion/server/data
+# ... plus a few cheap extras that do not interfere with Node.
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
