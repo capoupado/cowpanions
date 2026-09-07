@@ -3,7 +3,7 @@
   "frameWidth": 32,
   "frameHeight": 32,
   "defaultScale": 3,
-  "facing": "left",
+  "facing": "right",
   "anchor": "bottom-center",
   "defaultVariant": "brown",
   "sheets": {

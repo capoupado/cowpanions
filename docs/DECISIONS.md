@@ -47,7 +47,7 @@ Both tracks must follow them.
 
 ## Sprite sheets (all seven share this layout)
 
-- 128x256 PNG, frames 32x32, 4 columns x 8 rows, source art faces **left**. Anchor is
+- 128x256 PNG, frames 32x32, 4 columns x 8 rows, source art faces **right** (head on the right, tail on the left; corrected 2026-09-07 after the first run showed inverted walking). Anchor is
   bottom-center. Row 7 is empty.
 - Row meanings (owner accepted this reading; the manifest is data and may be corrected later):
 
@@ -65,7 +65,7 @@ Both tracks must follow them.
   and `defaultVariant`. `frameWidth`/`frameHeight`/`animations` are shared by all sheets:
   ```json
   { "name": "cow", "frameWidth": 32, "frameHeight": 32, "defaultScale": 3,
-    "facing": "left", "anchor": "bottom-center", "defaultVariant": "brown",
+    "facing": "right", "anchor": "bottom-center", "defaultVariant": "brown",
     "sheets": { "brown": "cows_spritesheet_brown.png", "black0": "cows_spritesheet_black0.png", ... },
     "animations": { "walk": { "row": 4, "frames": 4, "fps": 8, "loop": true }, ... } }
   ```
