@@ -136,3 +136,14 @@ and away from the camera, and the old manifest looped them for LieDown and Sleep
 never walks toward or away from the viewer. `lie` and `sleep` both play a single still frame,
 row 5 frame 0 (standing, facing the camera). Row 6 (back turned) is unused. Manifest only; no code
 change. If distinct lie/sleep art is ever drawn, add it as new rows and repoint the manifest.
+
+## No filler cows trot out at startup (2026-09-07)
+
+Owner: "can we not show extra cows leaving when we start the app?" Before, the offline herd
+(self + fillers) was spawned as soon as the strips existed, and the first presence a few seconds
+later sent the fillers home. Now, while a freshly started pasture client is waiting for its first
+presence, the offline herd is only the self cow. Fillers appear only if no presence arrives within
+`Orchestrator.StartupGrace` (8 s) or the client stops. Same rule when multiplayer is toggled on or
+the connection settings change. Multiplayer off keeps the immediate full offline herd. The 20 s
+`FallbackGrace` for mid-session drops is unchanged.
+

@@ -23,6 +23,8 @@ internal sealed class Orchestrator : IDisposable
 {
     private const double GroundInsetDips = 6;
     private static readonly TimeSpan FallbackGrace = TimeSpan.FromSeconds(20);
+    /// <summary>How long a freshly started client may take to deliver its first presence before the offline fillers appear.</summary>
+    private static readonly TimeSpan StartupGrace = TimeSpan.FromSeconds(8);
 
     private readonly Application _app;
     private readonly StartupOptions _options;
@@ -47,6 +49,11 @@ internal sealed class Orchestrator : IDisposable
     private PresenceSnapshot? _lastPresence;
     private ConnectionState _connection = ConnectionState.Disconnected;
     private bool _online;
+    /// <summary>
+    /// True from client start until the first presence (or the startup grace) arrives. While set, the offline herd is
+    /// only the self cow, so fillers never show up just to trot out again when the pasture answers.
+    /// </summary>
+    private bool _awaitingFirstPresence;
     private bool _suspended;
     private double _lastTickSeconds;
     private int _currentFps;
@@ -115,6 +122,7 @@ internal sealed class Orchestrator : IDisposable
         _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_C, ArmChat);
         _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_M, ToggleMute);
 
+        _awaitingFirstPresence = _config.MultiplayerEnabled;
         BuildStrips();
 
         _tray = new TrayIconHost(_manifest.VariantNames);
@@ -498,13 +506,25 @@ internal sealed class Orchestrator : IDisposable
 
     private void StartClientIfEnabled()
     {
+        // Startup arms the flag before the strips are built so no filler is spawned; if no client starts after all,
+        // release it and show the full offline herd.
+        bool wasAwaiting = _awaitingFirstPresence;
+        _awaitingFirstPresence = false;
         if (_disposed || _client is not null || !_config.MultiplayerEnabled)
         {
+            if (wasAwaiting)
+            {
+                ApplyOffline();
+            }
             return;
         }
         if (!Uri.TryCreate(_config.ServerUrl, UriKind.Absolute, out var uri))
         {
             AppLog.Info("serverUrl invalid; multiplayer disabled for this run");
+            if (wasAwaiting)
+            {
+                ApplyOffline();
+            }
             return;
         }
         var client = new PastureClient(new PastureClientOptions
@@ -520,6 +540,10 @@ internal sealed class Orchestrator : IDisposable
         client.MembersChanged += snapshot => _dispatcher.BeginInvoke(DispatcherPriority.Normal, () => OnPresence(client, snapshot));
         client.ChatReceived += chat => _dispatcher.BeginInvoke(DispatcherPriority.Normal, () => OnChat(client, chat));
         _client = client;
+        _awaitingFirstPresence = true;
+        _fallback.Stop();
+        _fallback.Interval = StartupGrace;
+        _fallback.Start();
         client.Start();
         AppLog.Info("pasture client started (after first render)");
     }
@@ -536,11 +560,9 @@ internal sealed class Orchestrator : IDisposable
         _lastPresence = null;
         _connection = ConnectionState.Disconnected;
         _fallback.Stop();
+        _awaitingFirstPresence = false;
+        StartClientIfEnabled(); // sets _awaitingFirstPresence when a client actually starts
         ApplyOffline();
-        if (_config.MultiplayerEnabled)
-        {
-            StartClientIfEnabled();
-        }
         RefreshTray();
     }
 
@@ -560,6 +582,7 @@ internal sealed class Orchestrator : IDisposable
             _fallback.Stop();
             _online = false;
             _lastPresence = null;
+            _awaitingFirstPresence = false;
             ApplyOffline();
         }
         else if (_online && !_fallback.IsEnabled)
@@ -577,6 +600,15 @@ internal sealed class Orchestrator : IDisposable
     private void OnFallbackElapsed()
     {
         _fallback.Stop();
+        _fallback.Interval = FallbackGrace;
+        if (_awaitingFirstPresence)
+        {
+            // The pasture did not answer within the startup grace: show the offline herd after all.
+            _awaitingFirstPresence = false;
+            ApplyOffline();
+            RefreshTray();
+            return;
+        }
         if (_connection != ConnectionState.Connected)
         {
             _online = false;
@@ -594,7 +626,9 @@ internal sealed class Orchestrator : IDisposable
         }
         _online = true;
         _lastPresence = snapshot;
+        _awaitingFirstPresence = false;
         _fallback.Stop();
+        _fallback.Interval = FallbackGrace;
         ApplyPresence(snapshot);
         RefreshTray();
     }
@@ -612,11 +646,12 @@ internal sealed class Orchestrator : IDisposable
     /// <summary>
     /// Offline herd: the user's own cow (own colour, self marker) plus offlineHerdSize − 1 fillers, so colour and
     /// name changes are visible without a server. When presence arrives the self cow is already there and stays.
-    /// offlineHerdSize 0 means no cows at all.
+    /// offlineHerdSize 0 means no cows at all. While the first presence of a freshly started client is pending, only
+    /// the self cow is shown: fillers that would trot out seconds later when the pasture answers are never spawned.
     /// </summary>
     private void ApplyOffline()
     {
-        int herd = _config.OfflineHerdSize;
+        int herd = _awaitingFirstPresence ? Math.Min(1, _config.OfflineHerdSize) : _config.OfflineHerdSize;
         var members = herd >= 1
             ? new[] { new Member(_config.ClientId, _config.DisplayName, _config.Variant) }
             : Array.Empty<Member>();
