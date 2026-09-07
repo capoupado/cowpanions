@@ -78,4 +78,62 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool DestroyIcon(IntPtr hIcon);
+
+    // ---- SendInput: used only to synthesise Win+. so the Windows emoji panel opens over the focused chat box. ----
+
+    public const uint INPUT_KEYBOARD = 1;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
+    public const ushort VK_LWIN = 0x5B;
+    public const ushort VK_OEM_PERIOD = 0xBE;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MOUSEINPUT
+    {
+        public int dx;
+        public int dy;
+        public uint mouseData;
+        public uint dwFlags;
+        public uint time;
+        public IntPtr dwExtraInfo;
+    }
+
+    /// <summary>The union member is sized for MOUSEINPUT (the largest) so the struct matches the native layout on x64.</summary>
+    [StructLayout(LayoutKind.Explicit)]
+    public struct INPUTUNION
+    {
+        [FieldOffset(0)] public MOUSEINPUT mi;
+        [FieldOffset(0)] public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct INPUT
+    {
+        public uint type;
+        public INPUTUNION u;
+    }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern uint SendInput(uint nInputs, [In] INPUT[] pInputs, int cbSize);
+
+    /// <summary>Presses and releases Win+. as one batch. Returns the number of events injected (4 on success).</summary>
+    public static uint SendWinPeriod()
+    {
+        static INPUT Key(ushort vk, bool up) => new()
+        {
+            type = INPUT_KEYBOARD,
+            u = new INPUTUNION { ki = new KEYBDINPUT { wVk = vk, dwFlags = up ? KEYEVENTF_KEYUP : 0 } },
+        };
+        var inputs = new[] { Key(VK_LWIN, false), Key(VK_OEM_PERIOD, false), Key(VK_OEM_PERIOD, true), Key(VK_LWIN, true) };
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
+    }
 }

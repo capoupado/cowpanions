@@ -144,8 +144,26 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   **observed** — `Cowpanion.exe --dump-emoji out.png` (runs before the single-instance mutex) produced a red heart,
   yellow 😂, 🎉 and a medium-skin-tone 👍🏽; 🇵🇹 shows as "PT" because Windows ships no flag glyphs.
 - [ ] **Chat-mode label** — the amber label now reads "Chat mode - Enter sends, Esc cancels, 8 s idle closes.
-  /moo /jump /spin = emote, emoji-only = reaction". **manual: to verify** — Ctrl+Alt+C and read it; still one line on
-  a 1080p-wide strip.
+  /moo /jump /spin = emote, emoji-only = reaction, smiley button or Win+. = emoji picker". **manual: to verify** —
+  Ctrl+Alt+C and read it; still one line on a 1080p-wide strip.
+- [ ] **Colour preview while typing** — the chat panel (now 340 DIPs: text box, preview strip, smiley button) shows the
+  emoji the draft will send as Direct2D bitmaps (`ChatInputHost.UpdatePreview`, pooled `Image`s, 20 DIPs at the
+  monitor's DPI scale) next to a caption naming the mode: "reaction" for emoji-only lines and `/heart`-style commands,
+  "emote: jump" for `/jump …`; a text line that contains emoji previews up to six of them then "…", so the black
+  outlines in the TextBox are identified. Empty draft: nothing shown. **manual: to verify** — Ctrl+Alt+C, type `❤️`:
+  a red heart and "reaction" appear right of the text; type `/jump hi 🎉`: "emote: jump" plus a coloured 🎉; type
+  `hello`: no preview; send and confirm the bubble/reaction matches the preview.
+- [ ] **Emoji picker button** — the 😊 button at the right end of the panel (colour bitmap; `Focusable=False` so the
+  text box keeps focus) synthesises Win+. through `SendInput` (`NativeMethods.SendWinPeriod`) and opens the Windows
+  emoji panel. Because that panel is a separate window, it deactivates ours; `ChatInputHost` sets a 15 s grace
+  (`_emojiPanelExpected`) during which `Deactivated` does not disarm and the idle counter is held at 0; the grace clears
+  on the next `TextChanged` (the picked emoji landing), on window re-activation, or when it expires. Click-through
+  handling is unchanged: the window is interactive only while armed and every exit still runs `Disarm`'s `finally`.
+  Log lines: `emoji button: sent Win+. (4/4 events)`, `window deactivated while the emoji panel is expected — staying
+  armed`, `emoji panel grace cleared (text changed)`. **manual: to verify** — Ctrl+Alt+C, click the smiley: the
+  Windows picker opens, chat mode stays armed (panel and amber bar still visible); pick an emoji: it lands in the box
+  and the colour preview shows it; Esc closes the picker, Enter sends. Then verify the strip is click-through again
+  after Enter, and that clicking elsewhere while the picker is closed still disarms.
 - [ ] **v2 compatibility** — hello sends `protocolVersion: 2`; a `welcome` with version 1 or 2 is accepted and logged
   as `welcome: vN …`; v1-shaped `chat` frames (text only) still render as bubbles. **automated: pass** —
   `PastureClientTests.Hello_is_the_first_frame_and_well_formed` (asserts 2), `Welcome_with_protocol_version_1_is_accepted`,

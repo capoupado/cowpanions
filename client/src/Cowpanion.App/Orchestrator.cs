@@ -210,7 +210,7 @@ internal sealed class Orchestrator : IDisposable
             var hoverLabel = new HoverLabelRenderer(window.BubbleCanvas, herd);
             var reactions = new ReactionRenderer(window.BubbleCanvas, herd, _emoji, monitor.Scale);
             var simRef = sim;
-            var chat = new ChatInputHost(window, herd, () => simRef, SendChatAsync, AppLog.Info);
+            var chat = new ChatInputHost(window, herd, () => simRef, SendChatAsync, AppLog.Info, _emoji, monitor.Scale);
             chat.StateChanged += () => ApplyFps(ChooseFps());
             var strip = new Strip(monitor, window, sim, herd, bubbles, hoverLabel, reactions, chat);
             _strips.Add(strip);

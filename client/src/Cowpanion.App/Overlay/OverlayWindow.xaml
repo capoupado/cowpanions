@@ -32,17 +32,49 @@
                 HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10,0,0,8"
                 Background="#E0FFB000" CornerRadius="6" Padding="8,3">
             <TextBlock FontFamily="Segoe UI" FontSize="11" FontWeight="SemiBold" Foreground="#402800"
-                       Text="Chat mode - Enter sends, Esc cancels, 8 s idle closes. /moo /jump /spin = emote, emoji-only = reaction" />
+                       Text="Chat mode - Enter sends, Esc cancels, 8 s idle closes. /moo /jump /spin = emote, emoji-only = reaction, smiley button or Win+. = emoji picker" />
         </Border>
 
         <!-- Chat input, positioned near the user's own cow while armed. -->
         <Canvas x:Name="ChatCanvas">
             <Border x:Name="ChatPanel" Visibility="Collapsed"
-                    Background="#F4FFFFFF" BorderBrush="#CC7A5A3A" BorderThickness="1.5" CornerRadius="8" Padding="6"
-                    Width="300">
-                <TextBox x:Name="ChatBox" MaxLength="140" FontFamily="Segoe UI, Segoe UI Emoji" FontSize="13"
-                         BorderThickness="0" Background="Transparent" Foreground="#221E1A"
-                         AcceptsReturn="False" />
+                    Background="#F4FFFFFF" BorderBrush="#CC7A5A3A" BorderThickness="1.5" CornerRadius="8" Padding="6,4"
+                    Width="340">
+                <!-- [TextBox fills] [colour preview of the emoji that will be sent + mode caption] [emoji picker button] -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="ChatBox" Grid.Column="0" MaxLength="140" FontFamily="Segoe UI, Segoe UI Emoji" FontSize="13"
+                             BorderThickness="0" Background="Transparent" Foreground="#221E1A" VerticalAlignment="Center"
+                             AcceptsReturn="False" />
+                    <!-- WPF text has no colour-font support, so the TextBox shows emoji as black outlines; this strip shows
+                         the same clusters as Direct2D bitmaps (EmojiRasterizer) and a caption naming the send mode. -->
+                    <StackPanel x:Name="PreviewArea" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="6,0,2,0" IsHitTestVisible="False" Visibility="Collapsed">
+                        <StackPanel x:Name="EmojiPreview" Orientation="Horizontal" VerticalAlignment="Center" />
+                        <TextBlock x:Name="PreviewCaption" FontFamily="Segoe UI" FontSize="9" Foreground="#8A6A4A"
+                                   VerticalAlignment="Center" Margin="4,0,0,0" />
+                    </StackPanel>
+                    <Button x:Name="EmojiButton" Grid.Column="2" Width="26" Height="26" Focusable="False" Cursor="Hand"
+                            ToolTip="Emoji (Win+.)" Padding="0" Margin="2,0,0,0" IsTabStop="False">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="Bg" Background="Transparent" CornerRadius="5">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Bg" Property="Background" Value="#22000000" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                        <TextBlock x:Name="EmojiButtonFallback" FontFamily="Segoe UI Emoji" FontSize="15" Text="😊" />
+                    </Button>
+                </Grid>
             </Border>
         </Canvas>
     </Grid>
