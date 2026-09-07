@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Cowpanion — a small herd of cows for the bottom of your screen</title>
+  <meta name="description" content="Cowpanion is a free Windows desktop toy: pixel-art cows graze along the bottom of your screen, one for each friend who has it open. No accounts, no telemetry.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<a class="skip" href="#what">Skip to content</a>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <p class="kicker">A desktop toy for Windows</p>
+    <h1 class="title">Cowpanion</h1>
+    <p class="tagline">A small herd of pixel cows grazes along the bottom of your screen. One cow for every friend who has it open.</p>
+
+    <p class="cta">
+      <a class="button" href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-x64.zip">
+        Download Cowpanion <span class="button-sub">zip · about 61 MB</span>
+      </a>
+    </p>
+    <p class="meta">Windows 10/11 (x64) · free · no account · no installer</p>
+    <p class="meta small"><a href="https://github.com/capoupado/cowpanions">Source on GitHub</a> · <a href="privacy.html">Privacy</a></p>
+  </div>
+
+  <!-- Decorative herd. The sprite sheets are the real ones the app uses. -->
+  <div class="pasture" aria-hidden="true">
+    <div class="herd">
+      <div class="walker" style="--dur:38s; --delay:-4s"><span class="sprite walk" style="--sheet:url(assets/cow_brown.png)"></span></div>
+      <div class="walker" style="--dur:46s; --delay:-19s"><span class="sprite walk" style="--sheet:url(assets/cow_white_darkspots.png)"></span></div>
+      <div class="walker" style="--dur:42s; --delay:-30s"><span class="sprite walk" style="--sheet:url(assets/cow_black0.png)"></span></div>
+      <div class="walker" style="--dur:52s; --delay:-9s"><span class="sprite walk" style="--sheet:url(assets/cow_white_pinkspots.png)"></span></div>
+      <div class="walker" style="--dur:44s; --delay:-40s"><span class="sprite walk" style="--sheet:url(assets/cow_white1.png)"></span></div>
+      <div class="grazer" style="left:71%"><span class="sprite idle"  style="--sheet:url(assets/cow_white0.png)"></span></div>
+    </div>
+    <div class="ground"></div>
+  </div>
+</header>
+
+<main>
+
+  <section id="what" class="wrap section">
+    <h2>What it does</h2>
+    <ul class="features">
+      <li>
+        <span class="sprite walk feature-sprite" style="--sheet:url(assets/cow_brown.png)" role="img" aria-label="A brown pixel-art cow walking"></span>
+        <h3>Lives on top of everything, gets in the way of nothing</h3>
+        <p>The cows walk along the bottom edge of your screen, above every window. The overlay never takes focus, never appears in Alt-Tab or the taskbar, and every click passes straight through to whatever is underneath. It hides itself during fullscreen games and presentations.</p>
+      </li>
+      <li>
+        <span class="sprite idle feature-sprite" style="--sheet:url(assets/cow_white_darkspots.png)" role="img" aria-label="A white cow with dark spots, standing"></span>
+        <h3>Each cow is a friend</h3>
+        <p>Everyone who runs Cowpanion in the same pasture gets a cow on everyone else's screen. When a friend opens the app their cow walks in from the edge; when they close it, their cow trots off. Your own cow has a small marker so you can spot it.</p>
+      </li>
+      <li>
+        <span class="sprite idle feature-sprite bubbled" style="--sheet:url(assets/cow_black0.png)" role="img" aria-label="A black cow with a speech bubble that says moo"><span class="bubble">moo</span></span>
+        <h3>Say something small</h3>
+        <p>Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, type a short line, press Enter. It shows up as a speech bubble over your cow on every screen in the pasture for a few seconds, then fades. There is no chat log to scroll back through. That's the point.</p>
+      </li>
+      <li>
+        <span class="sprite graze feature-sprite" style="--sheet:url(assets/cow_white_pinkspots.png)" role="img" aria-label="A white cow with pink spots, grazing"></span>
+        <h3>Quiet by default</h3>
+        <p>Completely silent. Low CPU, since cows are slow. If the server is down or you are offline, the herd keeps grazing locally with a few filler cows. Nothing ever waits on the network.</p>
+      </li>
+    </ul>
+  </section>
+
+  <section id="install" class="band">
+    <div class="wrap section">
+      <h2>How to install</h2>
+      <ol class="steps">
+        <li>
+          <h3>Download the zip</h3>
+          <p><a href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-x64.zip">Cowpanion-win-x64.zip</a> is a self-contained build for Windows 10/11 on x64. It is about 61 MB because the .NET runtime is bundled, so nothing else needs to be installed.</p>
+        </li>
+        <li>
+          <h3>Extract it somewhere permanent</h3>
+          <p>For example <code>%LOCALAPPDATA%\Cowpanion</code>. Don't run it straight from Downloads: the "Start with Windows" entry points at wherever the exe lives, so if you move it later the shortcut breaks.</p>
+        </li>
+        <li>
+          <h3>Run <code>Cowpanion.exe</code></h3>
+          <p>On first run it asks for a display name (your Windows user name is prefilled, up to 16 characters). That is the only window in the app that will ever take focus. Then the cows arrive.</p>
+          <aside class="note">
+            <strong>About the SmartScreen warning.</strong> Windows will probably show "Windows protected your PC" the first time, because the exe is not code-signed (signing certificates cost real money and this is a hobby project). Click <em>More info</em>, then <em>Run anyway</em>. If you would rather not trust an unsigned exe from a stranger, the <a href="https://github.com/capoupado/cowpanions">source is on GitHub</a> and you can build it yourself with the .NET 10 SDK.
+          </aside>
+        </li>
+        <li>
+          <h3>Optional: start with Windows</h3>
+          <p>Right-click the tray icon and tick <em>Start with Windows</em>. Untick it to remove the entry again. There is no installer and no admin rights are needed; the app writes only to <code>%APPDATA%\Cowpanion</code>.</p>
+        </li>
+      </ol>
+
+      <h3 class="subhead">Hotkeys</h3>
+      <table class="hotkeys">
+        <tbody>
+          <tr><th scope="row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd></th><td>Chat: type a line, Enter sends, Esc cancels</td></tr>
+          <tr><th scope="row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd></th><td>Mute or unmute speech bubbles</td></tr>
+          <tr><th scope="row"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd></th><td>Quit immediately, from anywhere</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="friends" class="wrap section">
+    <h2>Play with friends</h2>
+    <div class="cols">
+      <div>
+        <h3>Pastures</h3>
+        <p>A pasture is the room your herd lives in. Everyone starts in the shared one, called <code>commons</code>. For a private herd, agree on a code with your friends (lowercase letters, digits and dashes, up to 32 characters) and set <code>"pasture"</code> in <code>%APPDATA%\Cowpanion\config.json</code>. The app picks the change up on its own; no restart needed.</p>
+        <p class="small">A pasture code is a shared secret, not a login. Anyone who knows it can join.</p>
+      </div>
+      <div>
+        <h3>Talking</h3>
+        <p><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> opens a small input next to your cow. Bubbles hold about two short lines, stay up for six seconds and queue politely if someone is chatty. If it gets to be too much, <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>M</kbd> mutes bubbles until you press it again.</p>
+      </div>
+    </div>
+
+    <h3>Seven colours</h3>
+    <p>Pick yours from the tray menu under <em>Cow colour</em>. Friends see the colour you chose.</p>
+    <ul class="colours">
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_brown.png); --delay:0s" role="img" aria-label="Brown cow"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_black0.png); --delay:-.3s" role="img" aria-label="Black cow"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_black1.png); --delay:-.6s" role="img" aria-label="Black cow, second pattern"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_white0.png); --delay:-.1s" role="img" aria-label="White cow"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_white1.png); --delay:-.5s" role="img" aria-label="White cow, second pattern"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_white_darkspots.png); --delay:-.8s" role="img" aria-label="White cow with dark spots"></span></li>
+      <li><span class="sprite idle" style="--sheet:url(assets/cow_white_pinkspots.png); --delay:-.2s" role="img" aria-label="White cow with pink spots"></span></li>
+    </ul>
+  </section>
+
+  <section id="privacy" class="band">
+    <div class="wrap section">
+      <h2>Privacy</h2>
+      <p>This is a toy, so it should not know anything about you. Concretely:</p>
+      <ul class="plain">
+        <li>No accounts, no sign-up, no email. You pick a display name and that is it.</li>
+        <li>No message history. Chat is relayed live and never written to disk, on your machine or on the server.</li>
+        <li>No telemetry, no crash reports, no update checks, no analytics, no third-party services. The app talks to exactly one server and sends only what the protocol needs: a random client id, your pasture code, your display name, your cow colour, a heartbeat, and the messages you type.</li>
+        <li>The server's access logs contain IP addresses and are deleted after at most 7 days.</li>
+        <li>Turn multiplayer off in the tray menu and the app makes no network connections at all.</li>
+      </ul>
+      <p>The full statement ships next to the exe as <code>PRIVACY.md</code>. It is <a href="privacy.html">reproduced here</a>. This website itself is static files with no scripts, fonts or images loaded from anywhere else.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <p><a href="https://github.com/capoupado/cowpanions">github.com/capoupado/cowpanions</a> · <a href="privacy.html">Privacy</a></p>
+    <p>Made by Carlos. The cows are pixel art; the code is C# and a little Node.</p>
+  </div>
+  <div class="pasture footer-pasture" aria-hidden="true">
+    <div class="herd">
+      <div class="walker" style="--dur:50s; --delay:-12s"><span class="sprite walk small-sprite" style="--sheet:url(assets/cow_white0.png)"></span></div>
+      <div class="walker" style="--dur:58s; --delay:-36s"><span class="sprite walk small-sprite" style="--sheet:url(assets/cow_black1.png)"></span></div>
+      <div class="walker" style="--dur:54s; --delay:-50s"><span class="sprite walk small-sprite" style="--sheet:url(assets/cow_brown.png)"></span></div>
+    </div>
+    <div class="ground"></div>
+  </div>
+</footer>
+
+</body>
+</html>

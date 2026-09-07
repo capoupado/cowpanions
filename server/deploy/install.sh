@@ -9,7 +9,7 @@
 #   1. creates the unprivileged `cowpanion` system user
 #   2. clones or fast-forwards the monorepo at /opt/cowpanion
 #   3. npm ci --omit=dev inside /opt/cowpanion/server
-#   4. installs the systemd unit, nginx site and logrotate rule
+#   4. installs the systemd unit, nginx site (plus the static site at /var/www/cows) and logrotate rule
 #   5. enables the nginx site, reloads nginx, enables and (re)starts the service
 # It does NOT obtain the TLS certificate — see RUNBOOK.md for the certbot step.
 set -euo pipefail
@@ -72,6 +72,9 @@ systemctl daemon-reload
 log "nginx site"
 install -d -m 750 -o www-data -g adm /var/log/nginx/cows
 install -d -m 755 /var/www/html
+# static announcement site (repo folder site/) served from the https root
+install -d -m 755 /var/www/cows
+cp -r "$APP_DIR/site/." /var/www/cows/
 if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
   install -m 644 "$DEPLOY_DIR/nginx-cows.conf" /etc/nginx/sites-available/cows
 else

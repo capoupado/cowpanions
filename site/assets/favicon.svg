@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <!-- tiny pixel cow face -->
+  <rect x="2" y="3" width="2" height="2" fill="#d9c8a5"/>
+  <rect x="12" y="3" width="2" height="2" fill="#d9c8a5"/>
+  <rect x="3" y="5" width="10" height="7" fill="#8b5a2b"/>
+  <rect x="5" y="4" width="6" height="1" fill="#8b5a2b"/>
+  <rect x="2" y="7" width="1" height="2" fill="#8b5a2b"/>
+  <rect x="13" y="7" width="1" height="2" fill="#8b5a2b"/>
+  <rect x="5" y="7" width="1" height="1" fill="#1e1610"/>
+  <rect x="10" y="7" width="1" height="1" fill="#1e1610"/>
+  <rect x="4" y="12" width="8" height="2" fill="#e9b7a0"/>
+  <rect x="5" y="13" width="1" height="1" fill="#1e1610"/>
+  <rect x="10" y="13" width="1" height="1" fill="#1e1610"/>
+</svg>

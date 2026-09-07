@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Cowpanion — Privacy</title>
+  <meta name="description" content="What Cowpanion stores, what it sends, and what the pasture server keeps.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+<main class="wrap doc">
+  <a class="back" href="index.html">&larr; Back to Cowpanion</a>
+
+  <h1>Cowpanion — Privacy</h1>
+
+  <p>Cowpanion is a desktop toy: a few pixel-art cows graze along the bottom of your screen. This page explains exactly what it does with your data. It is the same text as the <code>PRIVACY.md</code> file that ships next to <code>Cowpanion.exe</code>.</p>
+
+  <h2>What is stored on your machine</h2>
+  <ul>
+    <li><code>%APPDATA%\Cowpanion\config.json</code> — your settings, your chosen display name, your chosen cow colour, and a random <code>clientId</code> (32 hex characters). The <code>clientId</code> is generated once from the operating system's cryptographic random number generator. It is <strong>not</strong> derived from your hostname, user name, MAC address or anything else that identifies you or your computer.</li>
+    <li><code>%APPDATA%\Cowpanion\cowpanion.log</code> — a small diagnostic log (connection state, config warnings). Chat text is <strong>never</strong> written to this log or anywhere else on disk.</li>
+    <li><code>HKCU\Software\Microsoft\Windows\CurrentVersion\Run\Cowpanion</code> — only if you turn on <code>startWithWindows</code>.</li>
+  </ul>
+
+  <h2>What is sent over the network</h2>
+  <p>Only if <code>multiplayerEnabled</code> is true (the default), and only to the single pasture server configured in <code>serverUrl</code> (default <code>wss://cows.carlospoupado.com/ws</code>), over TLS:</p>
+  <ul>
+    <li>On connect: protocol version, your <code>clientId</code>, the pasture code, your display name, your cow colour.</li>
+    <li>While connected: a <code>ping</code> every 20 seconds, and any chat message you deliberately type and send with Enter.</li>
+    <li>On quit: a courtesy <code>bye</code>.</li>
+  </ul>
+  <p>That is the complete list. No hostname, OS version, usage counters, crash reports or telemetry are ever sent. There are no other network calls of any kind: no update checks, no analytics, no third-party services.</p>
+  <p>Set <code>multiplayerEnabled</code> to <code>false</code> (tray menu → Multiplayer) and the app makes <strong>no</strong> network connections at all.</p>
+
+  <h2>What other people see</h2>
+  <p>Everyone in the same pasture sees your display name, your cow colour, and the chat messages you send. A pasture code is a shared secret, not authentication — treat every pasture as public to anyone who has the code.</p>
+
+  <h2>What the server keeps</h2>
+  <p>The server does not persist chat messages. Its access logs (which include IP addresses) rotate out after at most 7 days. See the server's own documentation for the full statement.</p>
+
+  <h2>Chat input</h2>
+  <p>Cowpanion never intercepts your clicks or keystrokes. The overlay is click-through at all times except during chat mode, which you start with <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>, which shows a visible indicator, and which ends automatically after 8 seconds of inactivity, on Enter, on Escape, or when you click anywhere else.</p>
+
+  <h2>This website</h2>
+  <p>This site is a few static files. It loads no scripts, fonts, images or anything else from third parties, and sets no cookies. It is served by the same nginx that fronts the pasture server, so a visit appears in the same access log, with the same 7-day retention.</p>
+</main>
+
+</body>
+</html>
