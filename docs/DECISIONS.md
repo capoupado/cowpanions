@@ -58,8 +58,8 @@ Both tracks must follow them.
   | 2 | 4 | `idle2` | body bob; use as a second idle variant |
   | 3 | 4 | `moo` | frames 2–3 have the mouth open |
   | 4 | 4 | `walk` | clear leg motion |
-  | 5 | 4 | `lie` | faces camera, tail wag; used for LieDown |
-  | 6 | 4 | `sleep` | faces away, tail wag |
+  | 5 | 4 | (walk toward camera) | frames 1 and 3 step a leg; only frame 0 is used, as a still `lie`/`sleep` pose (see "Front/back rows", 2026-09-07) |
+  | 6 | 4 | (walk away from camera) | unused |
 
 - Manifest format extends the plan's format with a `sheets` map, one entry per variant,
   and `defaultVariant`. `frameWidth`/`frameHeight`/`animations` are shared by all sheets:
@@ -127,3 +127,12 @@ proxy, `proxy_read_timeout 300s`, HSTS, own logs under `/var/log/nginx/cows/`), 
 DNS for `cows.carlospoupado.com` resolves to Cloudflare. nginx maps `CF-Connecting-IP` into
 `X-Forwarded-For` so the server's per-IP cap sees real client addresses. Cloudflare's 100 s
 WebSocket idle timeout is comfortably above the 20 s heartbeat.
+
+## Front/back rows are walk cycles, not rest poses (2026-09-07)
+
+The owner saw cows "walking with their back turned to the screen" and "walking towards the
+screen". Rows 5 and 6 are not tail wags: frames 1 and 3 step a leg, so they are walk cycles toward
+and away from the camera, and the old manifest looped them for LieDown and Sleep. Decision: a cow
+never walks toward or away from the viewer. `lie` and `sleep` both play a single still frame,
+row 5 frame 0 (standing, facing the camera). Row 6 (back turned) is unused. Manifest only; no code
+change. If distinct lie/sleep art is ever drawn, add it as new rows and repoint the manifest.

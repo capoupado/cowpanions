@@ -21,7 +21,7 @@
     "idle2": { "row": 2, "frames": 4, "fps": 4, "loop": true },
     "moo":   { "row": 3, "frames": 4, "fps": 4, "loop": false },
     "walk":  { "row": 4, "frames": 4, "fps": 8, "loop": true },
-    "lie":   { "row": 5, "frames": 4, "fps": 3, "loop": true },
-    "sleep": { "row": 6, "frames": 4, "fps": 2, "loop": true }
+    "lie":   { "row": 5, "frames": 1, "fps": 1, "loop": true },
+    "sleep": { "row": 5, "frames": 1, "fps": 1, "loop": true }
   }
 }

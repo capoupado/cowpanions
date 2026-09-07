@@ -63,7 +63,9 @@ hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
 - The running client locks `client/src/Cowpanion.App/bin/Release/...`; publish with
   `-p:BaseOutputPath=bin-publish/` when it is running.
 - Sprite art faces **right** (head on the right). Manifest `facing: "right"`. Rows: 0 idle(3),
-  1 graze(2), 2 idle2(4), 3 moo(4), 4 walk(4), 5 lie(4), 6 sleep(4).
+  1 graze(2), 2 idle2(4), 3 moo(4), 4 walk(4), 5 walk-toward-camera(4), 6 walk-away(4). `lie` and
+  `sleep` show only row 5 frame 0 (still, facing the viewer); row 6 is unused. Cows never walk
+  toward or away from the screen.
 - `install.sh` re-executes itself if the pull changed it (bash keeps running the old copy
   otherwise). Keep that block if you edit the script.
 - nginx on the VPS is Debian's 1.22: no `http2 on;`. Domain is behind Cloudflare: client IP comes
