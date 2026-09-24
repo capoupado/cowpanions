@@ -190,3 +190,31 @@ Owner asked for hover name tags, cursor reactions, emotes, floating emoji reacti
   cows still cross the screen within about ten minutes; a blocked walker keeps its destination and
   only steps back briefly (up to three times per journey) before giving up. Cows in the back lane
   head for the nearest front gap rather than idling behind others.
+
+## Fifth round: hotkeys, focus mode, settings window, chat history (2026-09-24)
+
+Owner asked for configurable hotkeys, a "focus mode" that stops listening to keystrokes, a settings
+window, and a client-side chat history; auto-update is being explored separately. Take control and
+shared coordinates are parked. Decisions taken while implementing:
+
+- **Every hotkey is rebindable** (`hotkeys` object in config.json, Settings → Hotkeys). Allowed:
+  any modifiers + one key, except that a key with no Ctrl/Alt/Win must be F1–F24, Pause or Scroll
+  Lock — a bare letter or Space through RegisterHotKey would stop the user typing it anywhere.
+- **The kill hotkey can be rebound but never unbound**, and if its combination is taken the app
+  falls back to Ctrl+Alt+Shift+K. This amends the hard rule "Ctrl+Alt+Shift+K exists from P0":
+  a kill hotkey always exists; the combination is the user's choice. The other four can be unbound.
+- **Focus mode = release every hotkey except Quit and the focus-mode toggle** (default Ctrl+Alt+F,
+  can itself be unbound). It persists across restarts (`focusMode`). The app never hooked the
+  keyboard to begin with — RegisterHotKey only reports its own combinations — so this is the whole
+  of "not listening". It does not mute bubbles; that stays a separate toggle.
+- **While a capture box in Settings has focus, all hotkeys are unregistered, Quit included**, so
+  the box can record combinations the app itself owns. It is a normal focused window, not the
+  overlay, so no escape hatch is needed; hotkeys return when focus leaves the box or the window
+  closes.
+- **Settings window** is an ordinary focusable top-level window (like the first-run name dialog;
+  the overlay rules do not apply to it), opened only from the tray. It covers every key except
+  `clientId`; `serverUrl` sits under "Advanced". It writes through the same path as the tray.
+- **Chat history is client-side, memory only**, last 200 entries, gone on quit, never written to
+  disk. The plan's "message history" exclusion was about a server backlog; the server still keeps
+  nothing. History records while bubbles are muted or the overlay is paused — that is when it is
+  useful.

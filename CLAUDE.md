@@ -38,10 +38,11 @@ npm start                                 # 127.0.0.1:8787, env COWPANION_PORT /
 
 # client — dotnet is at "C:\Program Files\dotnet" (on the user PATH; not always in a fresh shell)
 cd client; dotnet build Cowpanion.sln -c Release      # must be 0 warnings (TreatWarningsAsErrors)
-dotnet test Cowpanion.sln -c Release                  # Core 44, Net 18 (Net takes ~35 s by design)
+dotnet test Cowpanion.sln -c Release                  # Core 72, Net 63 (Net takes ~35 s by design)
 dotnet publish src/Cowpanion.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true `
   -p:IncludeNativeLibrariesForSelfExtract=true -p:BaseOutputPath=bin-publish/ -o ../dist/Cowpanion-win-x64
 # Dev flags for the app: --exit-after N  --config PATH  --no-dialog  --inject-chat-exception  --dump-emoji PATH
+#                        --dump-windows DIR (settings + history windows to PNGs; before the mutex, nothing saved)
 
 # deploy (on the VPS, as root): pulls, npm ci, installs unit + nginx site + static site, restarts
 bash /opt/cowpanion/server/deploy/install.sh
@@ -50,10 +51,10 @@ bash /opt/cowpanion/server/deploy/install.sh
 ## Invariants (release blockers — see client plan "Hard rules")
 
 Overlay never takes focus, never in Alt-Tab, click-through except while chat mode is armed
-(bounded, indicator shown, restored in `finally`). Kill hotkey Ctrl+Alt+Shift+K registered before
-any window. Single instance (`Global\Cowpanion`). No telemetry, no network beyond the pasture
-server. Server never persists or logs chat text; access logs keep IPs 7 days max. Present cows are
-hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
+(bounded, indicator shown, restored in `finally`). Kill hotkey (default Ctrl+Alt+Shift+K, rebindable,
+never unbindable, falls back to the default if taken) registered before any window. Single instance
+(`Global\Cowpanion`). No telemetry, no network beyond the pasture server, no keyboard hook.
+Server never persists or logs chat text; access logs keep IPs 7 days max. Present cows are hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
 
 ## Gotchas learned the hard way
 

@@ -79,24 +79,42 @@ A small diagnostic log lives next to it in `cowpanion.log` (never contains chat 
 | `pasture` | `"commons"` | room code, `[a-z0-9-]{1,32}` |
 | `displayName` | `""` | asked once on first run (Windows user name prefilled), max 16 chars |
 | `clientId` | `""` | generated once from a CSPRNG (32 hex chars); never derived from anything identifying |
-| `bubblesEnabled` / `bubblesMuted` | `true` / `false` | mute is toggled by `Ctrl+Alt+M` and persists |
+| `bubblesEnabled` / `bubblesMuted` | `true` / `false` | mute is toggled by the mute hotkey and persists |
 | `offlineHerdSize` | `4` | filler cows when multiplayer is off or unreachable (0–12) |
 | `variant` | `""` | cow colour; empty = derived from `clientId` once and saved. Tray → Cow colour |
+| `hotkeys` | see below | `kill`, `chat`, `mute`, `heart`, `focusMode`, each a combination like `"Ctrl+Alt+C"`; `""` unbinds (not allowed for `kill`) |
+| `focusMode` | `false` | release every hotkey except `kill` and `focusMode`; persists until turned off |
+
+Everything except `clientId` is also editable in **Settings…** (tray menu, or double-click the tray icon).
 
 Variants: `black0`, `black1`, `brown`, `white0`, `white1`, `white_darkspots`, `white_pinkspots`.
 
 ## Hotkeys
 
-| Keys | Action |
+Defaults below; every one can be rebound in Settings → Hotkeys or in `config.json`. Text form is modifiers (`Ctrl`,
+`Alt`, `Shift`, `Win`) then one key: `A`–`Z`, `0`–`9`, `F1`–`F24`, `Num0`–`Num9`, `Space`, `Enter`, `Tab`, `Esc`,
+arrows, `Home`/`End`/`PageUp`/`PageDown`/`Insert`/`Delete`, `Pause`, `ScrollLock`, `PrintScreen`, and the OEM keys by
+name (`Minus`, `Equals`, `Comma`, `Period`, `Slash`, `Semicolon`, `Quote`, `Backtick`, `LeftBracket`, `RightBracket`,
+`Backslash`). A key with no modifier or Shift only must be F1–F24, Pause or Scroll Lock, because anything else would
+swallow ordinary typing in every app. A combination Windows or another app already owns is reported in Settings and
+the log; if the quit combination is taken the app falls back to `Ctrl+Alt+Shift+K`.
+
+| Default | Action |
 | --- | --- |
-| `Ctrl+Alt+Shift+K` | quit immediately (registered before any overlay window exists) |
+| `Ctrl+Alt+Shift+K` | quit immediately (registered before any overlay window exists; can be rebound, never unbound) |
 | `Ctrl+Alt+C` | arm chat mode: input appears near your cow; Enter sends, Esc cancels, 8 s idle or a click elsewhere disarms |
 | `Ctrl+Alt+M` | mute/unmute speech bubbles (persisted) |
+| `Ctrl+Alt+H` | send a heart reaction |
+| `Ctrl+Alt+F` | focus mode on/off: while on, only quit and this toggle stay registered |
 
 ## Tray menu
 
-Status line · Multiplayer on/off · Mute bubbles · Cow colour ▸ (seven variants) · Filler herd + / − ·
-Open config · Reload config · Quit.
+Status line · Multiplayer on/off · Mute bubbles · Send a heart · Chat history… · Focus mode · Cow colour ▸
+(seven variants) · Filler herd + / − · Start with Windows · Settings… · Open config.json · Reload config.json · Quit.
+Labels show the current hotkey. Double-clicking the icon opens Settings.
+
+**Chat history** lists the last 200 messages, emotes and reactions received while the app runs (also while bubbles
+are muted or the overlay is paused for full screen). Memory only: nothing is written to disk and it is gone on quit.
 
 ## Notes for maintainers
 

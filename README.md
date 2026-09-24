@@ -24,7 +24,8 @@ No accounts, no message history, no telemetry. Windows 10/11 only.
 
 **Use it:** download the zip from the website, extract it somewhere permanent, run
 `Cowpanion.exe`, pick a name. Tray icon → *Start with Windows* if you like. Hotkeys:
-`Ctrl+Alt+C` chat, `Ctrl+Alt+M` mute bubbles, `Ctrl+Alt+Shift+K` quit.
+`Ctrl+Alt+C` chat, `Ctrl+Alt+M` mute bubbles, `Ctrl+Alt+Shift+K` quit (all rebindable in tray →
+*Settings…*).
 
 **Build the client** (needs the .NET 10 SDK, no Visual Studio):
 

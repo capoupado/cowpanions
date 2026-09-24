@@ -22,10 +22,6 @@ internal static class NativeMethods
     public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_SHIFT = 0x0004;
     public const uint MOD_NOREPEAT = 0x4000;
-    public const uint VK_K = 0x4B;
-    public const uint VK_C = 0x43;
-    public const uint VK_M = 0x4D;
-    public const uint VK_H = 0x48;
 
     public const uint MONITOR_DEFAULTTONEAREST = 2;
     public const int MDT_EFFECTIVE_DPI = 0;

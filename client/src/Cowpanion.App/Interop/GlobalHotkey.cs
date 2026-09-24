@@ -38,6 +38,16 @@ internal sealed class GlobalHotkeys : IDisposable
         return ok;
     }
 
+    /// <summary>Releases every registered combination (config change, focus mode, the settings window's capture box).</summary>
+    public void UnregisterAll()
+    {
+        foreach (int id in _callbacks.Keys)
+        {
+            NativeMethods.UnregisterHotKey(_source.Handle, id);
+        }
+        _callbacks.Clear();
+    }
+
     private IntPtr Hook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == NativeMethods.WM_HOTKEY && _callbacks.TryGetValue(wParam.ToInt32(), out var callback))
@@ -50,11 +60,7 @@ internal sealed class GlobalHotkeys : IDisposable
 
     public void Dispose()
     {
-        foreach (int id in _callbacks.Keys)
-        {
-            NativeMethods.UnregisterHotKey(_source.Handle, id);
-        }
-        _callbacks.Clear();
+        UnregisterAll();
         _source.Dispose();
     }
 }

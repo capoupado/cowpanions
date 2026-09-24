@@ -20,6 +20,9 @@ internal sealed record StartupOptions
     /// <summary>--dump-emoji PATH: render a sample emoji string through EmojiRasterizer to a PNG at PATH and exit (no windows, no mutex).</summary>
     public string? DumpEmojiPath { get; init; }
 
+    /// <summary>--dump-windows DIR: render the settings and chat history windows to PNGs in DIR and exit (no mutex, nothing saved).</summary>
+    public string? DumpWindowsDir { get; init; }
+
     public static StartupOptions Parse(string[] args)
     {
         int exitAfter = 0;
@@ -27,6 +30,7 @@ internal sealed record StartupOptions
         bool inject = false;
         bool noDialog = false;
         string? dumpEmoji = null;
+        string? dumpWindows = null;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -49,6 +53,10 @@ internal sealed record StartupOptions
                     dumpEmoji = args[i + 1];
                     i++;
                     break;
+                case "--dump-windows" when i + 1 < args.Length:
+                    dumpWindows = args[i + 1];
+                    i++;
+                    break;
             }
         }
         return new StartupOptions
@@ -58,6 +66,7 @@ internal sealed record StartupOptions
             InjectChatException = inject,
             NoDialog = noDialog || exitAfter > 0,
             DumpEmojiPath = dumpEmoji,
+            DumpWindowsDir = dumpWindows,
         };
     }
 }

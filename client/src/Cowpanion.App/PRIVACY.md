@@ -40,5 +40,14 @@ The server does not persist chat messages. Its access logs (which include IP add
 ## Chat input
 
 Cowpanion never intercepts your clicks or keystrokes. The overlay is click-through at all times except during
-chat mode, which you start with `Ctrl+Alt+C`, which shows a visible indicator, and which ends automatically after
-8 seconds of inactivity, on Enter, on Escape, or when you click anywhere else.
+chat mode, which you start with the chat hotkey (`Ctrl+Alt+C` by default), which shows a visible indicator, and
+which ends automatically after 8 seconds of inactivity, on Enter, on Escape, or when you click anywhere else.
+
+The hotkeys are registered with Windows' `RegisterHotKey`: Windows tells Cowpanion only when one of its own
+combinations is pressed. Cowpanion installs no keyboard hook and never sees any other keystroke. Focus mode releases
+every combination except quit and the focus-mode toggle.
+
+## Chat history
+
+The tray's *Chat history* keeps the last 200 messages, emotes and reactions received while Cowpanion runs, in memory
+only. It is never written to disk and disappears when you quit or press *Clear*.

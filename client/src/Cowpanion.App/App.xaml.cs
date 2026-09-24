@@ -22,6 +22,11 @@ public partial class App : Application
             Shutdown(EmojiDump.Run(options.DumpEmojiPath));
             return;
         }
+        if (options.DumpWindowsDir is not null)
+        {
+            Shutdown(WindowDump.Run(options.DumpWindowsDir));
+            return;
+        }
 
         // Single instance: a second launch exits silently.
         if (!TryAcquireMutex())

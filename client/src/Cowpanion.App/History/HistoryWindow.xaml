@@ -1,0 +1,24 @@
+<Window x:Class="Cowpanion.App.History.HistoryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cowpanion — chat history"
+        Width="460" Height="420" MinWidth="300" MinHeight="200"
+        WindowStartupLocation="CenterScreen"
+        ShowInTaskbar="True"
+        FontFamily="Segoe UI" FontSize="13">
+    <DockPanel Margin="10">
+        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="False">
+            <TextBlock DockPanel.Dock="Left" x:Name="CountText" VerticalAlignment="Center" Foreground="#666" FontSize="12" />
+            <Button DockPanel.Dock="Right" Content="Close" Width="80" IsCancel="True" Click="OnClose" />
+            <Button DockPanel.Dock="Right" Content="Clear" Width="80" Margin="0,0,8,0" Click="OnClear" />
+            <Button DockPanel.Dock="Right" Content="Copy" Width="80" Margin="0,0,8,0" Click="OnCopy"
+                    ToolTip="Copy the selected lines (all lines if none are selected)" />
+        </DockPanel>
+        <Grid>
+            <ListBox x:Name="List" SelectionMode="Extended" HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled" />
+            <TextBlock x:Name="EmptyText" TextWrapping="Wrap" Foreground="#666" Margin="12" IsHitTestVisible="False"
+                       Text="Nothing yet. Messages, emotes and reactions from your pasture show up here while Cowpanion runs, even when bubbles are muted. The list lives in memory only (last 200) and is gone when you quit." />
+        </Grid>
+    </DockPanel>
+</Window>

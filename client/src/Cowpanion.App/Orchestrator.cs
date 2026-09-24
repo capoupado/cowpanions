@@ -4,7 +4,9 @@ using System.Windows.Threading;
 using Cowpanion.App.Audio;
 using Cowpanion.App.FirstRun;
 using Cowpanion.App.Interop;
+using Cowpanion.App.History;
 using Cowpanion.App.Overlay;
+using Cowpanion.App.Settings;
 using Cowpanion.App.Tray;
 using Cowpanion.Core.Configuration;
 using Cowpanion.Core.Simulation;
@@ -19,7 +21,7 @@ namespace Cowpanion.App;
 /// pasture client and the timers. Everything here runs on the UI thread; network and config-watcher callbacks are
 /// marshalled through the Dispatcher.
 /// </summary>
-internal sealed class Orchestrator : IDisposable
+internal sealed class Orchestrator : ISettingsHost, IDisposable
 {
     private const double GroundInsetDips = 6;
     private static readonly TimeSpan FallbackGrace = TimeSpan.FromSeconds(20);
@@ -33,6 +35,9 @@ internal sealed class Orchestrator : IDisposable
     private readonly List<Strip> _strips = new();
     private readonly Dictionary<string, HerdSimulator> _simulatorsByDevice = new(StringComparer.Ordinal);
     private readonly EmojiRasterizer _emoji = new();
+    private readonly ChatHistory _history = new();
+    /// <summary>Hotkey action name (as in config.json) → why it is not registered right now.</summary>
+    private readonly Dictionary<string, string> _hotkeyErrors = new(StringComparer.Ordinal);
     private readonly DispatcherTimer _tick;
     private readonly DispatcherTimer _topmost;
     private readonly DispatcherTimer _fullscreen;
@@ -46,6 +51,10 @@ internal sealed class Orchestrator : IDisposable
     private GlobalHotkeys _hotkeys = null!;
     private TrayIconHost _tray = null!;
     private MooPlayer _moo = null!;
+    private SettingsWindow? _settingsWindow;
+    private HistoryWindow? _historyWindow;
+    /// <summary>True while a hotkey capture box in the settings window has focus: nothing is registered, not even Quit.</summary>
+    private bool _hotkeysPaused;
     private PastureClient? _client;
     private PresenceSnapshot? _lastPresence;
     private ConnectionState _connection = ConnectionState.Disconnected;
@@ -114,15 +123,9 @@ internal sealed class Orchestrator : IDisposable
             _store.Save(_config);
         }
 
-        // Kill hotkey before any overlay window exists.
+        // Kill hotkey before any overlay window exists (ApplyHotkeys registers it first).
         _hotkeys = new GlobalHotkeys();
-        if (!_hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_SHIFT, NativeMethods.VK_K, () => Quit("kill hotkey")))
-        {
-            AppLog.Info("WARNING: kill hotkey Ctrl+Alt+Shift+K could not be registered");
-        }
-        _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_C, ArmChat);
-        _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_M, ToggleMute);
-        _hotkeys.Register(NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT, NativeMethods.VK_H, SendHeart);
+        ApplyHotkeys();
 
         _awaitingFirstPresence = _config.MultiplayerEnabled;
         BuildStrips();
@@ -137,6 +140,9 @@ internal sealed class Orchestrator : IDisposable
         _tray.HeartRequested += SendHeart;
         _tray.MultiplayerToggled += () => Mutate(c => c.MultiplayerEnabled = !c.MultiplayerEnabled);
         _tray.StartupToggled += () => Mutate(c => c.StartWithWindows = !c.StartWithWindows);
+        _tray.FocusModeToggled += ToggleFocusMode;
+        _tray.SettingsRequested += OpenSettings;
+        _tray.HistoryRequested += OpenHistory;
         RefreshTray();
 
         StartupRegistration.Apply(_config.StartWithWindows, AppLog.Info);
@@ -399,6 +405,67 @@ internal sealed class Orchestrator : IDisposable
         target.Chat.Arm();
     }
 
+    /// <summary>
+    /// Registers the configured hotkeys. Quit goes first; if its combination is taken it falls back to the default
+    /// Ctrl+Alt+Shift+K so the escape hatch always exists. In focus mode only Quit and the focus-mode toggle are
+    /// registered. Failures are kept in <see cref="_hotkeyErrors"/> for the settings window and the log.
+    /// </summary>
+    private void ApplyHotkeys()
+    {
+        _hotkeys.UnregisterAll();
+        _hotkeyErrors.Clear();
+        if (_hotkeysPaused)
+        {
+            return;
+        }
+        var h = _config.Hotkeys;
+        if (!RegisterBinding("kill", h.Kill, () => Quit("kill hotkey")))
+        {
+            bool fallback = h.Kill != HotkeyBindings.DefaultKill && RegisterBinding("killFallback", HotkeyBindings.DefaultKill, () => Quit("kill hotkey"));
+            _hotkeyErrors.Remove("killFallback");
+            if (fallback)
+            {
+                _hotkeyErrors["kill"] += $"; using {HotkeyBindings.DefaultKill} instead";
+            }
+            AppLog.Info(fallback ? $"kill hotkey {h.Kill} taken; fell back to {HotkeyBindings.DefaultKill}" : "WARNING: no kill hotkey could be registered");
+        }
+        RegisterBinding("focusMode", h.FocusMode, ToggleFocusMode);
+        if (_config.FocusMode)
+        {
+            AppLog.Info("focus mode: only the quit and focus-mode hotkeys are registered");
+            return;
+        }
+        RegisterBinding("chat", h.Chat, ArmChat);
+        RegisterBinding("mute", h.Mute, ToggleMute);
+        RegisterBinding("heart", h.Heart, SendHeart);
+    }
+
+    /// <summary>Empty text = unbound, which counts as success.</summary>
+    private bool RegisterBinding(string action, string text, Action callback)
+    {
+        if (text.Length == 0)
+        {
+            return true;
+        }
+        if (!Hotkey.TryParse(text, out var hotkey, out string error))
+        {
+            _hotkeyErrors[action] = error; // ConfigValidator canonicalises first, so this is belt and braces
+            return false;
+        }
+        if (_hotkeys.Register((uint)hotkey.Modifiers, hotkey.VirtualKey, callback))
+        {
+            return true;
+        }
+        _hotkeyErrors[action] = "in use by Windows or another app";
+        AppLog.Info($"hotkey {action} = {hotkey} could not be registered (taken)");
+        return false;
+    }
+
+    private void ToggleFocusMode()
+    {
+        Mutate(c => c.FocusMode = !c.FocusMode);
+    }
+
     private void ToggleMute()
     {
         Mutate(c => c.BubblesMuted = !c.BubblesMuted);
@@ -447,14 +514,89 @@ internal sealed class Orchestrator : IDisposable
         }
     }
 
-    /// <summary>Changes config from the UI: mutate, save, apply. The watcher ignores our own write.</summary>
-    private void Mutate(Action<CowpanionConfig> change)
+    /// <summary>Changes config from the UI: mutate, save, apply. The watcher ignores our own write. Returns the clamp corrections.</summary>
+    private List<string> Mutate(Action<CowpanionConfig> change)
     {
         var next = _config.Clone();
         change(next);
-        ConfigValidator.Clamp(next);
+        var warnings = ConfigValidator.Clamp(next);
         _store.Save(next);
         ApplyConfig(next);
+        return warnings;
+    }
+
+    // ---------------------------------------------------------------- settings and history windows
+
+    private void OpenSettings()
+    {
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.Activate();
+            return;
+        }
+        var window = new SettingsWindow(this, _manifest.VariantNames, FindSpritePacks());
+        window.Closed += (_, _) =>
+        {
+            _settingsWindow = null;
+            SetHotkeysPaused(false);
+        };
+        _settingsWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
+    private void OpenHistory()
+    {
+        if (_historyWindow is not null)
+        {
+            _historyWindow.Activate();
+            return;
+        }
+        var window = new HistoryWindow(_history, _emoji);
+        window.Closed += (_, _) => _historyWindow = null;
+        _historyWindow = window;
+        window.Show();
+        window.Activate();
+    }
+
+    private static string[] FindSpritePacks()
+    {
+        string root = Path.Combine(AppContext.BaseDirectory, "assets", "sprites");
+        try
+        {
+            return Directory.GetDirectories(root)
+                .Where(d => File.Exists(Path.Combine(d, "manifest.json")))
+                .Select(d => Path.GetFileName(d))
+                .Order(StringComparer.Ordinal)
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Array.Empty<string>();
+        }
+    }
+
+    CowpanionConfig ISettingsHost.CurrentConfig => _config.Clone();
+
+    string ISettingsHost.ConfigPath => _store.Path;
+
+    IReadOnlyDictionary<string, string> ISettingsHost.HotkeyErrors => _hotkeyErrors;
+
+    IReadOnlyList<string> ISettingsHost.Apply(Action<CowpanionConfig> change) => Mutate(change);
+
+    void ISettingsHost.SetHotkeysPaused(bool paused) => SetHotkeysPaused(paused);
+
+    void ISettingsHost.OpenConfigFile() => OpenConfig();
+
+    private void SetHotkeysPaused(bool paused)
+    {
+        if (paused == _hotkeysPaused || _disposed)
+        {
+            return;
+        }
+        _hotkeysPaused = paused;
+        AppLog.Info(paused ? "hotkeys paused for capture" : "hotkeys resumed");
+        ApplyHotkeys();
     }
 
     private void ApplyConfig(CowpanionConfig next)
@@ -508,6 +650,17 @@ internal sealed class Orchestrator : IDisposable
         if (!next.PauseOnFullscreen && _suspended)
         {
             OnFullscreenPoll();
+        }
+        if (!prev.Hotkeys.SameAs(next.Hotkeys) || prev.FocusMode != next.FocusMode)
+        {
+            if (next.FocusMode && !prev.FocusMode)
+            {
+                foreach (var s in _strips)
+                {
+                    s.Chat.Disarm("focus mode");
+                }
+            }
+            ApplyHotkeys();
         }
         if (prev.SpritePack != next.SpritePack)
         {
@@ -711,7 +864,13 @@ internal sealed class Orchestrator : IDisposable
 
     private void OnChat(PastureClient sender, ChatMessage chat)
     {
-        if (!ReferenceEquals(sender, _client) || _suspended || !_config.BubblesEnabled || _config.BubblesMuted)
+        if (!ReferenceEquals(sender, _client))
+        {
+            return;
+        }
+        // History records everything received, including while muted or paused for fullscreen: that is when it helps.
+        _history.Add(chat, string.Equals(chat.FromId, sender.YourId ?? _config.ClientId, StringComparison.Ordinal), DateTimeOffset.Now);
+        if (_suspended || !_config.BubblesEnabled || _config.BubblesMuted)
         {
             return;
         }
@@ -860,6 +1019,8 @@ internal sealed class Orchestrator : IDisposable
             }
         }
         _strips.Clear();
+        _settingsWindow?.Close();
+        _historyWindow?.Close();
 
         var client = _client;
         _client = null;

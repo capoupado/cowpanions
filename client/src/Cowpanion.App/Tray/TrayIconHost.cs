@@ -13,8 +13,12 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ContextMenuStrip _menu = new();
     private readonly WinForms.ToolStripMenuItem _status = new("Starting…") { Enabled = false };
     private readonly WinForms.ToolStripMenuItem _multiplayer = new("Multiplayer") { CheckOnClick = false };
-    private readonly WinForms.ToolStripMenuItem _mute = new("Mute bubbles (Ctrl+Alt+M)");
-    private readonly WinForms.ToolStripMenuItem _heart = new("Send a heart (Ctrl+Alt+H)");
+    private readonly WinForms.ToolStripMenuItem _mute = new("Mute bubbles");
+    private readonly WinForms.ToolStripMenuItem _heart = new("Send a heart");
+    private readonly WinForms.ToolStripMenuItem _focus = new("Focus mode");
+    private readonly WinForms.ToolStripMenuItem _history = new("Chat history…");
+    private readonly WinForms.ToolStripMenuItem _settings = new("Settings…");
+    private readonly WinForms.ToolStripMenuItem _quit = new("Quit");
     private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
     private readonly WinForms.ToolStripMenuItem _colour = new("Cow colour");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
@@ -31,18 +35,20 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(_multiplayer);
         _menu.Items.Add(_mute);
         _menu.Items.Add(_heart);
+        _menu.Items.Add(_history);
+        _menu.Items.Add(_focus);
         _menu.Items.Add(_colour);
         _menu.Items.Add(_fillerPlus);
         _menu.Items.Add(_fillerMinus);
         _menu.Items.Add(new WinForms.ToolStripSeparator());
         _menu.Items.Add(_startup);
-        var open = new WinForms.ToolStripMenuItem("Open config");
-        var reload = new WinForms.ToolStripMenuItem("Reload config");
-        var quit = new WinForms.ToolStripMenuItem("Quit (Ctrl+Alt+Shift+K)");
+        _menu.Items.Add(_settings);
+        var open = new WinForms.ToolStripMenuItem("Open config.json");
+        var reload = new WinForms.ToolStripMenuItem("Reload config.json");
         _menu.Items.Add(open);
         _menu.Items.Add(reload);
         _menu.Items.Add(new WinForms.ToolStripSeparator());
-        _menu.Items.Add(quit);
+        _menu.Items.Add(_quit);
 
         foreach (var v in variants)
         {
@@ -59,7 +65,10 @@ internal sealed class TrayIconHost : IDisposable
         _fillerMinus.Click += (_, _) => FillerDelta?.Invoke(-1);
         open.Click += (_, _) => OpenConfigRequested?.Invoke();
         reload.Click += (_, _) => ReloadConfigRequested?.Invoke();
-        quit.Click += (_, _) => QuitRequested?.Invoke();
+        _quit.Click += (_, _) => QuitRequested?.Invoke();
+        _focus.Click += (_, _) => FocusModeToggled?.Invoke();
+        _history.Click += (_, _) => HistoryRequested?.Invoke();
+        _settings.Click += (_, _) => SettingsRequested?.Invoke();
 
         _icon = new WinForms.NotifyIcon
         {
@@ -68,6 +77,7 @@ internal sealed class TrayIconHost : IDisposable
             ContextMenuStrip = _menu,
             Visible = true,
         };
+        _icon.DoubleClick += (_, _) => SettingsRequested?.Invoke();
     }
 
     public event Action? QuitRequested;
@@ -79,12 +89,21 @@ internal sealed class TrayIconHost : IDisposable
     public event Action? HeartRequested;
     public event Action? MultiplayerToggled;
     public event Action? StartupToggled;
-
+    public event Action? FocusModeToggled;
+    public event Action? SettingsRequested;
+    public event Action? HistoryRequested;
     public void Update(CowpanionConfig config, string status)
     {
         _status.Text = status;
         _multiplayer.Checked = config.MultiplayerEnabled;
         _mute.Checked = config.BubblesMuted;
+        _focus.Checked = config.FocusMode;
+        var h = config.Hotkeys;
+        // In focus mode only Quit and the focus toggle are registered, so the other labels drop their combination.
+        _mute.Text = WithHotkey("Mute bubbles", config.FocusMode ? "" : h.Mute);
+        _heart.Text = WithHotkey("Send a heart", config.FocusMode ? "" : h.Heart);
+        _focus.Text = WithHotkey("Focus mode (no hotkeys)", h.FocusMode);
+        _quit.Text = WithHotkey("Quit", h.Kill);
         _startup.Checked = config.StartWithWindows;
         _fillerPlus.Text = "Filler herd + (now " + config.OfflineHerdSize.ToString(CultureInfo.InvariantCulture) + ")";
         _fillerMinus.Text = "Filler herd −";
@@ -99,6 +118,8 @@ internal sealed class TrayIconHost : IDisposable
         }
         _icon.Text = "Cowpanion — " + (status.Length > 40 ? status.Substring(0, 40) : status);
     }
+
+    private static string WithHotkey(string label, string hotkey) => hotkey.Length > 0 ? label + " (" + hotkey + ")" : label;
 
     private static IntPtr DrawIcon(out Icon icon)
     {

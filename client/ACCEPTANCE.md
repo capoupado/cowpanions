@@ -175,6 +175,43 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
 - [ ] **Hard rules unchanged** — no new focus paths (hotkey and tray send without arming), all new visuals live on the
   non-hit-testable `BubbleCanvas`, no new network calls beyond the existing socket. **observed** by code review.
 
+## Fifth round — hotkeys, focus mode, settings window, chat history
+
+- [ ] **Rebindable hotkeys** — `config.json` `hotkeys.{kill,chat,mute,heart,focusMode}`; parsed and canonicalised by
+  `Core/Configuration/Hotkey.cs` + `ConfigValidator.ClampHotkeys`; registered by `Orchestrator.ApplyHotkeys` (kill
+  first, still before any overlay window) and re-registered on every config change. Unparseable → that action's
+  default; `kill` can never be empty; a duplicate keeps the earlier action (kill always wins) and unbinds the later.
+  Bare typing keys (letters, Space, Shift+letter…) are refused; F1–F24, Pause and Scroll Lock may stand alone.
+  **automated: pass** — `HotkeyTests` (parse/canonicalise, rejections, old config gets defaults, clamp, duplicates,
+  deep clone). **manual: to verify** — Settings → Hotkeys, rebind Chat to `Ctrl+Shift+F10`, Apply, press it from
+  another app: chat arms; the old Ctrl+Alt+C does nothing. Bind Quit to something another app owns: the row says "in
+  use… using Ctrl+Alt+Shift+K instead" and Ctrl+Alt+Shift+K still quits.
+- [ ] **Capture box pauses hotkeys** — while a capture box has keyboard focus every hotkey, Quit included, is
+  unregistered (log `hotkeys paused for capture` / `hotkeys resumed`); closing the window always resumes.
+  **manual: to verify** — focus the Quit box, press Ctrl+Alt+Shift+K: the box shows it and the app does not quit;
+  click elsewhere, press it again: the app quits.
+- [ ] **Focus mode** — tray "Focus mode", its hotkey (default Ctrl+Alt+F) or the Settings checkbox; persisted as
+  `focusMode`. While on only kill and the focus toggle are registered (`focus mode: only the quit and focus-mode
+  hotkeys are registered` in the log); tray labels drop the other combinations; turning it on disarms chat mode.
+  **manual: to verify** — turn it on, press Ctrl+Alt+C / M / H in another app: they reach that app (e.g. type in
+  an editor that uses them) and Cowpanion does nothing; Ctrl+Alt+F turns it off again.
+- [ ] **Settings window** — tray "Settings…" or double-click the tray icon. Normal focusable window (not the overlay):
+  General / Pasture / Display / Hotkeys tabs covering every `config.json` key except `clientId`; OK / Apply validate
+  (name non-empty, pasture code, ws/wss URL, whole numbers, no duplicate hotkeys) and go through the same `Mutate` path
+  as the tray, so clamps are shown back. **observed** — `Cowpanion.exe --dump-windows <dir>` rendered all four tabs and
+  the hotkey error state. **manual: to verify** — change scale, monitors and pasture from the window; each applies
+  live like editing the file; Cancel changes nothing; a second "Settings…" click focuses the open window.
+- [ ] **Chat history** — tray "Chat history…": the last 200 received messages, emotes and reactions
+  (`Net/ChatHistory.cs`), recorded even while muted or paused for full screen; own messages in cow brown; emoji as
+  Direct2D bitmaps inline; Copy (selection or all, also Ctrl+C) and Clear; follows new entries live. Memory only.
+  **automated: pass** — `ChatHistoryTests`. **observed** — `--dump-windows` rendered sample text, reaction, emote
+  and mixed entries with colour emoji (and caught a routed-`DpiChanged` re-entrancy crash, fixed).
+  **manual: to verify** — two clients, send text / `/jump` / `❤️`, open history on both; mute and send more: history
+  still records; quit and relaunch: history is empty.
+- [ ] **Hard rules unchanged** — overlay focus and click-through paths untouched; the new windows are ordinary
+  top-level windows opened only by an explicit tray action; no keyboard hook; no new network calls.
+  **observed** by code review.
+
 ---
 
 ## How I launched things (for reproducibility)
