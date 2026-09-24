@@ -102,6 +102,38 @@ have the line ready before connecting. The clientId must be 32 hex characters.
 
 ---
 
+## 7. Publishing a client release (update feed)
+
+The Windows client updates itself through Velopack from `https://cows.carlospoupado.com/updates/`
+(nginx serves `/var/www/cows-updates`, which `install.sh` creates and never overwrites). On the PC:
+
+```powershell
+cd client
+.\release.ps1 -Version 0.2.0      # publish, fetch the previous release for deltas, vpk pack, SHA256SUMS
+```
+
+Then upload, in this order:
+
+1. GitHub release (the site's download buttons point at these asset names):
+   ```powershell
+   gh release create v0.2.0 ..\dist\releases\Cowpanion-win-Setup.exe ..\dist\releases\Cowpanion-win-Portable.zip ..\dist\releases\SHA256SUMS.txt --title v0.2.0 --notes-file ..\dist\RELEASE_NOTES.md
+   ```
+2. The feed. Packages first, feed file last, so no client ever sees a release whose package is
+   missing:
+   ```powershell
+   scp ..\dist\releases\Cowpanion-0.2.0-*.nupkg root@<vps>:/var/www/cows-updates/
+   scp ..\dist\releases\releases.win.json ..\dist\releases\assets.win.json root@<vps>:/var/www/cows-updates/
+   ```
+3. Check: `curl -sI https://cows.carlospoupado.com/updates/releases.win.json` gives `200` and
+   `cache-control: no-cache`. Running clients pick the release up within a day (or tray → Check
+   for updates), download it in the background and install it on the next restart.
+
+Keep `dist\releases` between releases: it is the delta base. If it is lost, `release.ps1`
+downloads the previous release from the feed again. Old `.nupkg` files on the VPS can be deleted
+once nobody runs that version; the newest full package must stay.
+
+Rollback: re-publish the previous build under a higher version number (Velopack never downgrades).
+
 ## Acceptance checks
 
 Each item names the criterion from `docs/cowpanion-server-plan.md` and the exact command.

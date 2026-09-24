@@ -27,6 +27,12 @@ public partial class App : Application
             Shutdown(WindowDump.Run(options.DumpWindowsDir));
             return;
         }
+        if (options.UpdateNow)
+        {
+            // Release testing: the same UpdateService the tray uses, before the mutex so it works next to a running client.
+            _ = UpdateNowAsync(options.UpdateFeed ?? Updates.UpdateService.DefaultFeed);
+            return;
+        }
 
         // Single instance: a second launch exits silently.
         if (!TryAcquireMutex())
@@ -72,6 +78,17 @@ public partial class App : Application
             _mutex = null;
         }
         base.OnExit(e);
+    }
+
+    private async Task UpdateNowAsync(string feed)
+    {
+        var updates = new Updates.UpdateService(feed, Dispatcher, line => Console.Error.WriteLine(line));
+        await updates.CheckAsync();
+        Console.Error.WriteLine($"update-now: {updates.Stage} {updates.Detail}");
+        if (updates.Stage != Updates.UpdateStage.Ready || !updates.RestartToApply(() => Shutdown(0)))
+        {
+            Shutdown(updates.Stage is Updates.UpdateStage.UpToDate ? 0 : 1);
+        }
     }
 
     private bool TryAcquireMutex()

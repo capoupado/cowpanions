@@ -50,6 +50,7 @@ public partial class SettingsWindow : Window
 
         LoadFrom(config);
         ShowHotkeyErrors();
+        VersionText.Text = "Version " + host.AppVersion + ". " + VersionText.Text + " Tray → Check for updates checks now.";
         Loaded += (_, _) => DisplayNameBox.Focus();
     }
 
@@ -61,6 +62,7 @@ public partial class SettingsWindow : Window
         StartWithWindowsBox.IsChecked = c.StartWithWindows;
         PauseOnFullscreenBox.IsChecked = c.PauseOnFullscreen;
         MooBox.IsChecked = c.MooEnabled;
+        AutoUpdateBox.IsChecked = c.AutoCheckForUpdates;
 
         MultiplayerBox.IsChecked = c.MultiplayerEnabled;
         PastureBox.Text = c.Pasture;
@@ -147,6 +149,7 @@ public partial class SettingsWindow : Window
             c.StartWithWindows = StartWithWindowsBox.IsChecked == true;
             c.PauseOnFullscreen = PauseOnFullscreenBox.IsChecked == true;
             c.MooEnabled = MooBox.IsChecked == true;
+            c.AutoCheckForUpdates = AutoUpdateBox.IsChecked == true;
             c.MultiplayerEnabled = MultiplayerBox.IsChecked == true;
             c.Pasture = pasture;
             c.BubblesEnabled = BubblesEnabledBox.IsChecked == true;

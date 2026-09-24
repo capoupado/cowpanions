@@ -54,6 +54,8 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Style="{StaticResource Label}" Text="Your name" />
                     <TextBox Grid.Row="0" Grid.Column="1" x:Name="DisplayNameBox" MaxLength="16" Margin="0,4" />
@@ -64,6 +66,9 @@
                     <CheckBox Grid.Row="3" Grid.ColumnSpan="2" x:Name="StartWithWindowsBox" Content="Start with Windows" />
                     <CheckBox Grid.Row="4" Grid.ColumnSpan="2" x:Name="PauseOnFullscreenBox" Content="Hide the cows while a full-screen app or presentation is running" />
                     <CheckBox Grid.Row="5" Grid.ColumnSpan="2" x:Name="MooBox" Content="Moo sound (no sound file ships yet, so this is silent)" />
+                    <CheckBox Grid.Row="6" Grid.ColumnSpan="2" x:Name="AutoUpdateBox" Content="Check for updates automatically (at start-up and once a day)" />
+                    <TextBlock Grid.Row="7" Grid.ColumnSpan="2" x:Name="VersionText" Style="{StaticResource Hint}"
+                               Text="Updates download in the background and install when Cowpanion restarts." />
                 </Grid>
             </TabItem>
 

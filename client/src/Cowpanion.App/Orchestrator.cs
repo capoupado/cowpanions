@@ -8,6 +8,7 @@ using Cowpanion.App.History;
 using Cowpanion.App.Overlay;
 using Cowpanion.App.Settings;
 using Cowpanion.App.Tray;
+using Cowpanion.App.Updates;
 using Cowpanion.Core.Configuration;
 using Cowpanion.Core.Simulation;
 using Cowpanion.Core.Sprites;
@@ -27,6 +28,9 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
     private static readonly TimeSpan FallbackGrace = TimeSpan.FromSeconds(20);
     /// <summary>How long a freshly started client may take to deliver its first presence before the offline fillers appear.</summary>
     private static readonly TimeSpan StartupGrace = TimeSpan.FromSeconds(8);
+    /// <summary>First automatic update check: late enough to stay out of startup, early enough to catch a fresh release.</summary>
+    private static readonly TimeSpan FirstUpdateCheck = TimeSpan.FromSeconds(45);
+    private static readonly TimeSpan UpdateCheckInterval = TimeSpan.FromHours(24);
 
     private readonly Application _app;
     private readonly StartupOptions _options;
@@ -43,6 +47,7 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
     private readonly DispatcherTimer _fullscreen;
     private readonly DispatcherTimer _fallback;
     private readonly DispatcherTimer _displayDebounce;
+    private readonly DispatcherTimer _updateTimer;
 
     private ConfigStore _store = null!;
     private CowpanionConfig _config = null!;
@@ -53,6 +58,9 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
     private MooPlayer _moo = null!;
     private SettingsWindow? _settingsWindow;
     private HistoryWindow? _historyWindow;
+    private UpdateService _updates = null!;
+    /// <summary>True while a check was started from the tray, so its outcome gets a balloon even when nothing changed.</summary>
+    private bool _manualUpdateCheck;
     /// <summary>True while a hotkey capture box in the settings window has focus: nothing is registered, not even Quit.</summary>
     private bool _hotkeysPaused;
     private PastureClient? _client;
@@ -85,6 +93,8 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         _fallback.Tick += (_, _) => OnFallbackElapsed();
         _displayDebounce = new DispatcherTimer(DispatcherPriority.Background, _dispatcher) { Interval = TimeSpan.FromSeconds(1) };
         _displayDebounce.Tick += (_, _) => OnDisplayDebounceElapsed();
+        _updateTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher) { Interval = FirstUpdateCheck };
+        _updateTimer.Tick += (_, _) => OnUpdateTimer();
     }
 
     /// <summary>Startup order matters: config → manifest → name → kill hotkey → strips → tray → timers → (later) network.</summary>
@@ -143,7 +153,21 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         _tray.FocusModeToggled += ToggleFocusMode;
         _tray.SettingsRequested += OpenSettings;
         _tray.HistoryRequested += OpenHistory;
+        _tray.CheckUpdatesRequested += () =>
+        {
+            _manualUpdateCheck = true;
+            _ = _updates.CheckAsync();
+        };
+        _tray.RestartToUpdateRequested += () => _updates.RestartToApply(() => Quit("update"));
         RefreshTray();
+
+        _updates = new UpdateService(_options.UpdateFeed ?? UpdateService.DefaultFeed, _dispatcher, AppLog.Info);
+        _updates.Changed += OnUpdateChanged;
+        OnUpdateChanged();
+        if (_config.AutoCheckForUpdates && _updates.Stage != UpdateStage.NotInstalled)
+        {
+            _updateTimer.Start();
+        }
 
         StartupRegistration.Apply(_config.StartWithWindows, AppLog.Info);
 
@@ -525,6 +549,63 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         return warnings;
     }
 
+    // ---------------------------------------------------------------- updates
+
+    private void OnUpdateTimer()
+    {
+        _updateTimer.Interval = UpdateCheckInterval;
+        if (_config.AutoCheckForUpdates)
+        {
+            _ = _updates.CheckAsync();
+        }
+    }
+
+    /// <summary>Tray labels follow the update stage; balloons only for news, or for any outcome of a manual check.</summary>
+    private void OnUpdateChanged()
+    {
+        string version = _updates.CurrentVersion;
+        switch (_updates.Stage)
+        {
+            case UpdateStage.NotInstalled:
+                _tray.SetUpdateItems($"Updates need the installed version (v{version})", false, null);
+                break;
+            case UpdateStage.Checking:
+                _tray.SetUpdateItems("Checking for updates…", false, null);
+                break;
+            case UpdateStage.Downloading:
+                _tray.SetUpdateItems($"Downloading v{_updates.Detail}… {_updates.Percent}%", false, null);
+                break;
+            case UpdateStage.Ready:
+                _tray.SetUpdateItems($"Check for updates (v{version})", false, $"Restart to update to v{_updates.Detail}");
+                if (_updateTimer.IsEnabled || _manualUpdateCheck)
+                {
+                    _tray.ShowBalloon("Cowpanion update ready", $"Version {_updates.Detail} is downloaded. Choose \"Restart to update\" in the tray menu, or it installs the next time Cowpanion starts.");
+                }
+                _manualUpdateCheck = false;
+                _updateTimer.Stop(); // nothing more to fetch until the restart
+                break;
+            case UpdateStage.UpToDate:
+                _tray.SetUpdateItems($"Check for updates (v{version})", true, null);
+                if (_manualUpdateCheck)
+                {
+                    _tray.ShowBalloon("Cowpanion is up to date", $"Version {version} is the latest.");
+                }
+                _manualUpdateCheck = false;
+                break;
+            case UpdateStage.Failed:
+                _tray.SetUpdateItems($"Check for updates (v{version})", true, null);
+                if (_manualUpdateCheck)
+                {
+                    _tray.ShowBalloon("Update check failed", "The update server could not be reached. Try again later; details are in cowpanion.log.");
+                }
+                _manualUpdateCheck = false;
+                break;
+            default:
+                _tray.SetUpdateItems($"Check for updates (v{version})", true, null);
+                break;
+        }
+    }
+
     // ---------------------------------------------------------------- settings and history windows
 
     private void OpenSettings()
@@ -579,6 +660,8 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
     CowpanionConfig ISettingsHost.CurrentConfig => _config.Clone();
 
     string ISettingsHost.ConfigPath => _store.Path;
+
+    string ISettingsHost.AppVersion => _updates.CurrentVersion;
 
     IReadOnlyDictionary<string, string> ISettingsHost.HotkeyErrors => _hotkeyErrors;
 
@@ -661,6 +744,15 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
                 }
             }
             ApplyHotkeys();
+        }
+        if (prev.AutoCheckForUpdates != next.AutoCheckForUpdates && _updates.Stage != UpdateStage.NotInstalled)
+        {
+            _updateTimer.Stop();
+            if (next.AutoCheckForUpdates && _updates.Stage != UpdateStage.Ready)
+            {
+                _updateTimer.Interval = FirstUpdateCheck;
+                _updateTimer.Start();
+            }
         }
         if (prev.SpritePack != next.SpritePack)
         {
@@ -1004,6 +1096,7 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         _fullscreen.Stop();
         _fallback.Stop();
         _displayDebounce.Stop();
+        _updateTimer.Stop();
         SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
         SystemEvents.PowerModeChanged -= OnPowerModeChanged;
 

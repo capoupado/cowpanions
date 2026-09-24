@@ -10,6 +10,8 @@ internal interface ISettingsHost
 
     string ConfigPath { get; }
 
+    string AppVersion { get; }
+
     /// <summary>Hotkey action name ("kill", "chat", "mute", "heart", "focusMode") → why it is not registered.</summary>
     IReadOnlyDictionary<string, string> HotkeyErrors { get; }
 

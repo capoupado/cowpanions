@@ -218,3 +218,40 @@ shared coordinates are parked. Decisions taken while implementing:
   disk. The plan's "message history" exclusion was about a server backlog; the server still keeps
   nothing. History records while bubbles are muted or the overlay is paused — that is when it is
   useful.
+
+## Sixth round: self-update through Velopack, unsigned (2026-09-24)
+
+Owner chose Velopack over notify-only, and the unsigned path for now (SignPath Foundation needs an
+open-source licence, a CI build and clear sprite-sheet rights; revisit later). This overrides the
+client plan's "no auto-update" hard rule and "auto-update" in its permanently-out-of-scope list.
+
+- **Distribution changes from a single-file zip to Velopack**: `Cowpanion-win-Setup.exe` (per-user,
+  `%LOCALAPPDATA%\Cowpanion`, Start menu shortcut only, no admin) is the main download;
+  `Cowpanion-win-Portable.zip` is the no-installer alternative and self-updates too. The old
+  single-file `Cowpanion-win-x64.zip` cannot update; its users reinstall once.
+- **Feed on our own domain**: `https://cows.carlospoupado.com/updates/` (nginx, `/var/www/cows-updates`,
+  filled by hand from `client/release.ps1` output). GitHub Releases stays the download page. So the
+  network rule becomes "pasture server plus the update feed on the same domain".
+- **What a check sends**: one GET of `releases.win.json` with Velopack's query string `arch`, `os`,
+  `rid`, `id`, `localVersion` (verified by pointing Velopack 1.2.158 at a local listener). The
+  persistent per-install "staging id" Velopack keeps locally is **not** sent by its web source, so
+  Velopack's own source is used as is. Documented in both privacy pages.
+- **Integrity**: Velopack checks each package against the SHA-256 in the feed (tamper test: a
+  corrupted delta and full package were both rejected with `ChecksumFailedException` and the install
+  stayed on the old version). The feed itself is unsigned, so trust rests on HTTPS to our domain; a
+  compromised VPS or Cloudflare account could publish a malicious release. Accepted for a friends-only
+  hobby app; code signing is the fix when it matters.
+- **When**: `autoCheckForUpdates` (default **true**): first check 45 s after start, then every 24 h
+  while running; tray "Check for updates" any time. A found update downloads in the background;
+  the tray offers "Restart to update", otherwise Velopack applies it on the next start. Balloons
+  only for "update ready", or for any outcome of a manual check. Dev builds and the old zip report
+  "Updates need the installed version" and never touch the network for updates.
+- **Restart path**: `WaitExitThenApplyUpdates` then a normal quit (sends `bye`, releases the mutex),
+  so Velopack never has to kill the process. `Program.Main` owns startup so `VelopackApp.Run()` is
+  the first code; the uninstall hook removes the HKCU Run value. The Run value points at Velopack's
+  stub launcher one level above `current\` (the stub is named after the pack title, so the title
+  must stay "Cowpanion").
+- **Release tooling**: `vpk` pinned as a local dotnet tool (`client/dotnet-tools.json`), not global.
+  `release.ps1` publishes (self-contained, no longer single-file: Velopack packs a folder and makes
+  ~90 KB deltas from it), fetches the previous release for deltas, packs, writes SHA256SUMS and prints
+  the upload commands. It never uploads.

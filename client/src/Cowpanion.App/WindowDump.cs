@@ -125,6 +125,8 @@ internal static class WindowDump
 
         public string ConfigPath => "config.json";
 
+        public string AppVersion => "0.1.0";
+
         public IReadOnlyDictionary<string, string> HotkeyErrors { get; } = new Dictionary<string, string> { ["heart"] = "in use by Windows or another app" };
 
         public IReadOnlyList<string> Apply(Action<CowpanionConfig> change) => [];

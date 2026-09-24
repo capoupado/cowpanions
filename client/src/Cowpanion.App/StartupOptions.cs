@@ -23,6 +23,12 @@ internal sealed record StartupOptions
     /// <summary>--dump-windows DIR: render the settings and chat history windows to PNGs in DIR and exit (no mutex, nothing saved).</summary>
     public string? DumpWindowsDir { get; init; }
 
+    /// <summary>--update-feed URL|DIR: use this Velopack feed instead of the production one (release testing).</summary>
+    public string? UpdateFeed { get; init; }
+
+    /// <summary>--update-now: check the feed, download and apply an update with no UI, then exit (before the mutex; release testing).</summary>
+    public bool UpdateNow { get; init; }
+
     public static StartupOptions Parse(string[] args)
     {
         int exitAfter = 0;
@@ -31,6 +37,8 @@ internal sealed record StartupOptions
         bool noDialog = false;
         string? dumpEmoji = null;
         string? dumpWindows = null;
+        string? updateFeed = null;
+        bool updateNow = false;
         for (int i = 0; i < args.Length; i++)
         {
             switch (args[i])
@@ -53,6 +61,13 @@ internal sealed record StartupOptions
                     dumpEmoji = args[i + 1];
                     i++;
                     break;
+                case "--update-now":
+                    updateNow = true;
+                    break;
+                case "--update-feed" when i + 1 < args.Length:
+                    updateFeed = args[i + 1];
+                    i++;
+                    break;
                 case "--dump-windows" when i + 1 < args.Length:
                     dumpWindows = args[i + 1];
                     i++;
@@ -67,6 +82,8 @@ internal sealed record StartupOptions
             NoDialog = noDialog || exitAfter > 0,
             DumpEmojiPath = dumpEmoji,
             DumpWindowsDir = dumpWindows,
+            UpdateFeed = updateFeed,
+            UpdateNow = updateNow,
         };
     }
 }

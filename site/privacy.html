@@ -32,8 +32,11 @@
     <li>While connected: a <code>ping</code> every 20 seconds, and any chat message you deliberately type and send with Enter.</li>
     <li>On quit: a courtesy <code>bye</code>.</li>
   </ul>
-  <p>That is the complete list. No hostname, OS version, usage counters, crash reports or telemetry are ever sent. There are no other network calls of any kind: no update checks, no analytics, no third-party services.</p>
-  <p>Set <code>multiplayerEnabled</code> to <code>false</code> (tray menu → Multiplayer) and the app makes <strong>no</strong> network connections at all.</p>
+  <p>That is the complete list. No hostname, OS version, usage counters, crash reports or telemetry are ever sent. The only other network call is the update check below. No analytics, no third-party services.</p>
+
+  <h2>Update checks</h2>
+  <p>The installed version checks <code>https://cows.carlospoupado.com/updates/</code> shortly after it starts and once a day, and whenever you choose <em>Check for updates</em> in the tray. Each check is one plain HTTPS request for a small file listing the releases; its address carries the app id, your current version, <code>os=win</code> and <code>arch=x64</code>, and nothing else (no <code>clientId</code>, no name). A newer version is downloaded from the same address, checked against the SHA-256 in that list, and installed the next time Cowpanion starts. A check appears in the access log with your IP address for at most 7 days, like any page view. Turn off <em>Check for updates automatically</em> in Settings and the app only checks when you ask.</p>
+  <p>Set <code>multiplayerEnabled</code> to <code>false</code> (tray menu → Multiplayer) and turn off automatic update checks, and the app makes <strong>no</strong> network connections at all.</p>
 
   <h2>What other people see</h2>
   <p>Everyone in the same pasture sees your display name, your cow colour, and the chat messages you send. A pasture code is a shared secret, not authentication — treat every pasture as public to anyone who has the code.</p>

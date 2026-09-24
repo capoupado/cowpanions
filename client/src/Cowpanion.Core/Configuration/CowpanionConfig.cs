@@ -33,6 +33,8 @@ public sealed class CowpanionConfig
     public HotkeyBindings Hotkeys { get; set; } = new();
     /// <summary>Focus mode: every global hotkey is released except Quit and the focus-mode toggle itself.</summary>
     public bool FocusMode { get; set; } = false;
+    /// <summary>Check the update feed shortly after start-up and once a day while running (installed builds only).</summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
 
     public CowpanionConfig Clone()
     {

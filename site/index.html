@@ -20,11 +20,11 @@
     <p class="tagline">A small herd of pixel cows grazes along the bottom of your screen. One cow for every friend who has it open.</p>
 
     <p class="cta">
-      <a class="button" href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-x64.zip">
-        Download Cowpanion <span class="button-sub">zip · about 61 MB</span>
+      <a class="button" href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-Setup.exe">
+        Download Cowpanion <span class="button-sub">installer · about 80 MB</span>
       </a>
     </p>
-    <p class="meta">Windows 10/11 (x64) · free · no account · no installer</p>
+    <p class="meta">Windows 10/11 (x64) · free · no account · no admin rights · updates itself</p>
     <p class="meta small"><a href="https://github.com/capoupado/cowpanions">Source on GitHub</a> · <a href="privacy.html">Privacy</a></p>
   </div>
 
@@ -75,23 +75,24 @@
       <h2>How to install</h2>
       <ol class="steps">
         <li>
-          <h3>Download the zip</h3>
-          <p><a href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-x64.zip">Cowpanion-win-x64.zip</a> is a self-contained build for Windows 10/11 on x64. It is about 61 MB because the .NET runtime is bundled, so nothing else needs to be installed.</p>
-        </li>
-        <li>
-          <h3>Extract it somewhere permanent</h3>
-          <p>For example <code>%LOCALAPPDATA%\Cowpanion</code>. Don't run it straight from Downloads: the "Start with Windows" entry points at wherever the exe lives, so if you move it later the shortcut breaks.</p>
-        </li>
-        <li>
-          <h3>Run <code>Cowpanion.exe</code></h3>
-          <p>On first run it asks for a display name (your Windows user name is prefilled, up to 16 characters). That is the only window in the app that will ever take focus. Then the cows arrive.</p>
+          <h3>Download and run the installer</h3>
+          <p><a href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-Setup.exe">Cowpanion-win-Setup.exe</a> installs a self-contained build for Windows 10/11 on x64 into <code>%LOCALAPPDATA%\Cowpanion</code> and adds a Start menu entry. No admin rights and nothing else to install: the .NET runtime is bundled, which is why it is about 80 MB.</p>
           <aside class="note">
-            <strong>About the SmartScreen warning.</strong> Windows will probably show "Windows protected your PC" the first time, because the exe is not code-signed (signing certificates cost real money and this is a hobby project). Click <em>More info</em>, then <em>Run anyway</em>. If you would rather not trust an unsigned exe from a stranger, the <a href="https://github.com/capoupado/cowpanions">source is on GitHub</a> and you can build it yourself with the .NET 10 SDK.
+            <strong>About the SmartScreen warning.</strong> Windows will probably show "Windows protected your PC" the first time, because the installer is not code-signed (signing certificates cost real money and this is a hobby project). Click <em>More info</em>, then <em>Run anyway</em>. If you would rather not trust an unsigned exe from a stranger, the <a href="https://github.com/capoupado/cowpanions">source is on GitHub</a> and you can build it yourself with the .NET 10 SDK.
           </aside>
         </li>
         <li>
+          <h3>Pick a name</h3>
+          <p>On first run it asks for a display name (your Windows user name is prefilled, up to 16 characters). Then the cows arrive. Everything else lives in the tray icon: <em>Settings…</em> (or double-click the icon), chat history, focus mode.</p>
+        </li>
+        <li>
           <h3>Optional: start with Windows</h3>
-          <p>Right-click the tray icon and tick <em>Start with Windows</em>. Untick it to remove the entry again. There is no installer and no admin rights are needed; the app writes only to <code>%APPDATA%\Cowpanion</code>.</p>
+          <p>Right-click the tray icon and tick <em>Start with Windows</em>. Untick it to remove the entry again.</p>
+        </li>
+        <li>
+          <h3>Updates</h3>
+          <p>Cowpanion checks for a new version shortly after it starts and once a day, downloads it in the background and installs it the next time it starts (or right away with <em>Restart to update</em> in the tray). You can check by hand from the tray, or turn automatic checks off in Settings. Uninstall from Windows Settings → Apps.</p>
+          <p>Prefer no installer? <a href="https://github.com/capoupado/cowpanions/releases/latest/download/Cowpanion-win-Portable.zip">Cowpanion-win-Portable.zip</a> runs from any folder and updates itself the same way. On the old <code>Cowpanion-win-x64.zip</code>? That one cannot update itself; install once with the installer above.</p>
         </li>
       </ol>
 

@@ -31,14 +31,15 @@ dotnet test  -c Release          # Core + Net tests, headless, ~40 s
 dotnet run --project src/Cowpanion.App -c Release
 ```
 
-Publish a self-contained single-file x64 build:
+Releases (installer, portable zip, update feed) come from `.\release.ps1 -Version X.Y.Z`; see "Releases and
+updates" below. A plain self-contained folder for local testing:
 
 ```powershell
-dotnet publish src/Cowpanion.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+dotnet publish src/Cowpanion.App -c Release -r win-x64 --self-contained -p:BaseOutputPath=bin-publish/ -o publish
 ```
 
-`publish/` then holds `Cowpanion.exe` (plus the WPF native DLLs, `assets/`, `PRIVACY.md`). Copy the folder anywhere
-and run `Cowpanion.exe`. `bin/`, `obj/` and `publish/` are git-ignored.
+`publish/` then holds `Cowpanion.exe` plus its DLLs, `assets/` and `PRIVACY.md`. Such a build is not a Velopack
+install, so it never checks for updates. `bin/`, `obj/` and `publish/` are git-ignored.
 
 ### P0 spike (CPU measurement)
 
@@ -56,6 +57,10 @@ Prints CPU % of total every 5 s and an average at exit. Kill hotkey `Ctrl+Alt+Sh
 | `--config PATH` | App only: use this config file instead of `%APPDATA%\Cowpanion\config.json` |
 | `--no-dialog` | App only: skip the first-run name dialog (implied by `--exit-after`) |
 | `--inject-chat-exception` | App only: the first `Ctrl+Alt+C` throws after dropping click-through, to prove the finally path restores it |
+| `--dump-emoji PATH` | App only: render sample colour emoji to a PNG and exit (runs before the mutex) |
+| `--dump-windows DIR` | App only: render the settings window (one PNG per tab) and the chat history window with sample entries to DIR and exit (before the mutex, nothing saved) |
+| `--update-feed URL\|DIR` | App only: use this Velopack feed instead of `https://cows.carlospoupado.com/updates` |
+| `--update-now` | App only: check, download and apply an update with no UI, then exit (before the mutex; release testing on an installed build) |
 | `--report` | Spike only: print average CPU at exit |
 
 ## Configuration
@@ -84,6 +89,7 @@ A small diagnostic log lives next to it in `cowpanion.log` (never contains chat 
 | `variant` | `""` | cow colour; empty = derived from `clientId` once and saved. Tray → Cow colour |
 | `hotkeys` | see below | `kill`, `chat`, `mute`, `heart`, `focusMode`, each a combination like `"Ctrl+Alt+C"`; `""` unbinds (not allowed for `kill`) |
 | `focusMode` | `false` | release every hotkey except `kill` and `focusMode`; persists until turned off |
+| `autoCheckForUpdates` | `true` | installed builds: check the update feed 45 s after start and every 24 h |
 
 Everything except `clientId` is also editable in **Settings…** (tray menu, or double-click the tray icon).
 
@@ -110,11 +116,26 @@ the log; if the quit combination is taken the app falls back to `Ctrl+Alt+Shift+
 ## Tray menu
 
 Status line · Multiplayer on/off · Mute bubbles · Send a heart · Chat history… · Focus mode · Cow colour ▸
-(seven variants) · Filler herd + / − · Start with Windows · Settings… · Open config.json · Reload config.json · Quit.
+(seven variants) · Filler herd + / − · Start with Windows · Settings… · Check for updates (shows the version) ·
+Restart to update (only when one is downloaded) · Open config.json · Reload config.json · Quit.
 Labels show the current hotkey. Double-clicking the icon opens Settings.
 
 **Chat history** lists the last 200 messages, emotes and reactions received while the app runs (also while bubbles
 are muted or the overlay is paused for full screen). Memory only: nothing is written to disk and it is gone on quit.
+
+## Releases and updates
+
+Distribution is Velopack (`Updates/UpdateService.cs`, `Program.cs`). `.\release.ps1 -Version X.Y.Z` builds
+`..\dist\releases\` with `Cowpanion-win-Setup.exe`, `Cowpanion-win-Portable.zip`, the full and delta `.nupkg`,
+`releases.win.json` and `SHA256SUMS.txt`, then prints the upload commands (GitHub release + scp of the feed to the
+VPS; see `server/deploy/RUNBOOK.md` section 7). `vpk` comes from the local tool manifest (`dotnet tool restore`).
+
+Testing an update end to end without touching a real install: build two versions with
+`-PackId CowpanionTest -PackTitle "Cowpanion Test" -OutDir <temp> -NoDownload`, install the first with
+`CowpanionTest-win-Setup.exe --silent`, pack a newer one, serve `<temp>\releases` with
+`python -m http.server 18788 --bind 127.0.0.1`, run
+`%LOCALAPPDATA%\CowpanionTest\current\Cowpanion.exe --update-now --update-feed http://127.0.0.1:18788`, check
+`current\sq.version`, then `%LOCALAPPDATA%\CowpanionTest\Update.exe --silent --uninstall`.
 
 ## Notes for maintainers
 
@@ -127,12 +148,13 @@ are muted or the overlay is paused for full screen). Memory only: nothing is wri
 
 ## Installing on another PC
 
-1. Copy the `Cowpanion-win-x64` folder (from `dotnet publish`, or the zip in `dist/`) to a
-   permanent location, e.g. `%LOCALAPPDATA%\Cowpanion`. Do not run it from Downloads: the
-   "Start with Windows" entry points at wherever the exe lives.
-2. Run `Cowpanion.exe`. First run asks for a display name; everything else is defaults
-   (pasture `commons`, server `wss://cows.carlospoupado.com/ws`).
-3. Tray icon → **Start with Windows** to launch at logon (writes `HKCU\...\Run\Cowpanion`).
-   Untick it, or set `startWithWindows: false` in the config, to remove the entry.
+1. Run `Cowpanion-win-Setup.exe` (from the website / GitHub release). It installs per-user into
+   `%LOCALAPPDATA%\Cowpanion` with a Start menu entry and starts the app; no admin rights. Or unzip
+   `Cowpanion-win-Portable.zip` anywhere permanent and run `Cowpanion.exe` from it.
+2. First run asks for a display name; everything else is defaults (pasture `commons`, server
+   `wss://cows.carlospoupado.com/ws`).
+3. Tray icon → **Start with Windows** to launch at logon (writes `HKCU\...\Run\Cowpanion`, pointing at the
+   launcher). Untick it, or set `startWithWindows: false` in the config, to remove the entry.
+4. Updates arrive by themselves (tray → Check for updates to force one). Uninstall from Windows Settings → Apps.
 
-No installer, no admin rights, nothing outside `%LOCALAPPDATA%` and `%APPDATA%\Cowpanion`.
+Nothing outside `%LOCALAPPDATA%\Cowpanion`, `%APPDATA%\Cowpanion` and that one Run value.

@@ -39,10 +39,10 @@ npm start                                 # 127.0.0.1:8787, env COWPANION_PORT /
 # client — dotnet is at "C:\Program Files\dotnet" (on the user PATH; not always in a fresh shell)
 cd client; dotnet build Cowpanion.sln -c Release      # must be 0 warnings (TreatWarningsAsErrors)
 dotnet test Cowpanion.sln -c Release                  # Core 72, Net 63 (Net takes ~35 s by design)
-dotnet publish src/Cowpanion.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true `
-  -p:IncludeNativeLibrariesForSelfExtract=true -p:BaseOutputPath=bin-publish/ -o ../dist/Cowpanion-win-x64
+.\release.ps1 -Version 0.1.0                          # Velopack release into ../dist/releases (never uploads)
 # Dev flags for the app: --exit-after N  --config PATH  --no-dialog  --inject-chat-exception  --dump-emoji PATH
 #                        --dump-windows DIR (settings + history windows to PNGs; before the mutex, nothing saved)
+#                        --update-feed URL|DIR  --update-now (update test on an installed build, before the mutex)
 
 # deploy (on the VPS, as root): pulls, npm ci, installs unit + nginx site + static site, restarts
 bash /opt/cowpanion/server/deploy/install.sh
@@ -53,11 +53,17 @@ bash /opt/cowpanion/server/deploy/install.sh
 Overlay never takes focus, never in Alt-Tab, click-through except while chat mode is armed
 (bounded, indicator shown, restored in `finally`). Kill hotkey (default Ctrl+Alt+Shift+K, rebindable,
 never unbindable, falls back to the default if taken) registered before any window. Single instance
-(`Global\Cowpanion`). No telemetry, no network beyond the pasture server, no keyboard hook.
-Server never persists or logs chat text; access logs keep IPs 7 days max. Present cows are hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
+(`Global\Cowpanion`). No telemetry, no network beyond the pasture server and the update feed on the same
+domain, no keyboard hook. Server never persists or logs chat text; access logs keep IPs 7 days max.
+Present cows are hard-clamped to the strip; arrivals walk in, departures trot out (never pop).
 
 ## Gotchas learned the hard way
 
+- Updates are Velopack. `VelopackApp.Run()` must stay the first line of `Program.Main`. Test updates
+  only under a different pack id (`-PackId CowpanionTest`, see client/README "Releases and updates");
+  never install the real `Cowpanion` pack id on this machine. The stub launcher is named after
+  `--packTitle`, and `StartupRegistration` expects it to equal the exe name, so the title stays
+  "Cowpanion". `release.ps1` must run in Windows PowerShell 5.1 too (no `?.` / `??`).
 - **Never `Stop-Process -Name Cowpanion*`.** Carlos runs the real client on this machine. A second
   launch exits silently on the mutex, so test copies must check `Get-Process Cowpanion` first and
   stop only the PID they started. Same for `node` servers.
@@ -92,6 +98,8 @@ record each decision in `docs/DECISIONS.md`. Commit with his name/email; push on
 
 - Sleep trigger: user inactivity (current) vs. herd stillness.
 - No `moo.wav`; the moo feature is a no-op hook and the site says "completely silent".
-- First GitHub Release (`v0.1.0`, upload `dist/Cowpanion-win-x64.zip`) must be created by Carlos;
-  the site's download button 404s until then.
+- First GitHub Release (`v0.1.0`: `Cowpanion-win-Setup.exe`, `Cowpanion-win-Portable.zip`,
+  `SHA256SUMS.txt` from `release.ps1`) and the first feed upload to `/var/www/cows-updates` must be
+  done by Carlos; the site's download buttons 404 until then. Redeploy the server first (nginx `/updates/`).
+- Code signing (SignPath needs an OSS licence + CI + sprite rights) is deferred; builds are unsigned.
 - Manual acceptance items in the three ACCEPTANCE files.

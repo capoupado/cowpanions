@@ -23,9 +23,20 @@ Only if `multiplayerEnabled` is true (the default), and only to the single pastu
 - On quit: a courtesy `bye`.
 
 That is the complete list. No hostname, OS version, usage counters, crash reports or telemetry are ever sent.
-There are no other network calls of any kind: no update checks, no analytics, no third-party services.
+The only other network call is the update check below. No analytics, no third-party services.
 
-Set `multiplayerEnabled` to `false` (tray menu → Multiplayer) and the app makes **no** network connections at all.
+## Update checks
+
+The installed version checks `https://cows.carlospoupado.com/updates/` shortly after it starts and once a day, and
+whenever you choose *Check for updates* in the tray. Each check is one plain HTTPS request for a small file listing
+the releases; its address carries the app id, your current version, `os=win` and `arch=x64`, and nothing else (no
+`clientId`, no name). If there is a newer version its package is downloaded from the same address, checked against
+the SHA-256 published in that list, and installed the next time Cowpanion starts. Like any request to the site, a
+check appears in the access log with your IP address for at most 7 days. Turn off *Check for updates automatically*
+in Settings and the app only checks when you ask.
+
+Set `multiplayerEnabled` to `false` (tray menu → Multiplayer) and turn off automatic update checks, and the app makes
+**no** network connections at all.
 
 ## What other people see
 

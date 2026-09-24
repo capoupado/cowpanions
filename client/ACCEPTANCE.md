@@ -212,6 +212,31 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   top-level windows opened only by an explicit tray action; no keyboard hook; no new network calls.
   **observed** by code review.
 
+## Sixth round — Velopack installer and self-update
+
+- [ ] **Release pipeline** — `release.ps1` (PowerShell 5.1 and 7) publishes, packs with the pinned `vpk`, writes
+  SHA256SUMS. **observed** — packed 0.0.1–0.0.4 under pack id `CowpanionTest`: Setup.exe ~80 MB, full nupkg ~73 MB,
+  deltas ~89 KB (7 of 271 files patched); a 5.1 run first failed on a `?.` operator (fixed).
+- [ ] **Install, update, uninstall** — **observed** (test pack id, local HTTP feed, real client left running):
+  `Setup.exe --silent` installed 0.0.2 to `%LOCALAPPDATA%\CowpanionTest`; `--update-now` went 0.0.2 → 0.0.3 (full
+  package) and 0.0.3 → 0.0.4 (delta), each time `update-now: Ready` → `restarting into …` → `current\sq.version`
+  showed the new version; `Update.exe --silent --uninstall` removed the folder, the Start menu entry and the
+  uninstall key. The user's running client (other folder, same mutex) was never affected.
+- [ ] **Tamper rejection** — **observed**: feed pointing at corrupted 0.0.3 delta + full packages →
+  `ChecksumFailedException: SHA256 doesn't match`, stage Failed, install stayed on 0.0.2.
+- [ ] **What a check sends** — **observed** in the local server log: `GET /releases.win.json?arch=x64&os=win&rid=win-x64&id=…&localVersion=…`,
+  then only the package file names. No client id, no staging id.
+- [ ] **Tray and Settings** — "Check for updates (vX)" / "Checking…" / "Downloading vY… N%" / "Restart to update to
+  vY"; balloons for update ready and for every manual-check outcome; Settings → General "Check for updates
+  automatically" + version line. **manual: to verify** after the first real release: install 0.1.0 from the site,
+  publish 0.1.1 to the feed, tray → Check for updates → balloon → Restart to update → the app comes back as 0.1.1
+  with the pasture reconnected; with automatic checks on, a newer release is picked up after ~45 s from a fresh start.
+- [ ] **Start with Windows under Velopack** — the Run value points at `%LOCALAPPDATA%\Cowpanion\Cowpanion.exe` (the
+  stub), not `current\`. **manual: to verify** — tick it on an installed build, check the value in regedit, reboot;
+  uninstall removes the value.
+- [ ] **Dev / old-zip builds** — tray shows "Updates need the installed version (vX)" disabled; no update request is
+  made. **observed** by code review (`UpdateService` stage NotInstalled when `UpdateManager.IsInstalled` is false).
+
 ---
 
 ## How I launched things (for reproducibility)

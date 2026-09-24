@@ -83,6 +83,8 @@ install -d -m 755 /var/www/html
 # static announcement site (repo folder site/) served from the https root
 install -d -m 755 /var/www/cows
 cp -r "$APP_DIR/site/." /var/www/cows/
+# client update feed: created here, filled by hand from client/release.ps1 output, never overwritten
+install -d -m 755 /var/www/cows-updates
 if [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ]; then
   install -m 644 "$DEPLOY_DIR/nginx-cows.conf" /etc/nginx/sites-available/cows
 else

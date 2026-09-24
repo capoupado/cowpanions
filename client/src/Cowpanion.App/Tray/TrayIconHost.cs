@@ -19,6 +19,8 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _history = new("Chat history…");
     private readonly WinForms.ToolStripMenuItem _settings = new("Settings…");
     private readonly WinForms.ToolStripMenuItem _quit = new("Quit");
+    private readonly WinForms.ToolStripMenuItem _checkUpdates = new("Check for updates");
+    private readonly WinForms.ToolStripMenuItem _restartToUpdate = new("Restart to update") { Visible = false };
     private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
     private readonly WinForms.ToolStripMenuItem _colour = new("Cow colour");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
@@ -43,6 +45,8 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
         _menu.Items.Add(_startup);
         _menu.Items.Add(_settings);
+        _menu.Items.Add(_checkUpdates);
+        _menu.Items.Add(_restartToUpdate);
         var open = new WinForms.ToolStripMenuItem("Open config.json");
         var reload = new WinForms.ToolStripMenuItem("Reload config.json");
         _menu.Items.Add(open);
@@ -69,6 +73,8 @@ internal sealed class TrayIconHost : IDisposable
         _focus.Click += (_, _) => FocusModeToggled?.Invoke();
         _history.Click += (_, _) => HistoryRequested?.Invoke();
         _settings.Click += (_, _) => SettingsRequested?.Invoke();
+        _checkUpdates.Click += (_, _) => CheckUpdatesRequested?.Invoke();
+        _restartToUpdate.Click += (_, _) => RestartToUpdateRequested?.Invoke();
 
         _icon = new WinForms.NotifyIcon
         {
@@ -92,6 +98,23 @@ internal sealed class TrayIconHost : IDisposable
     public event Action? FocusModeToggled;
     public event Action? SettingsRequested;
     public event Action? HistoryRequested;
+    public event Action? CheckUpdatesRequested;
+    public event Action? RestartToUpdateRequested;
+
+    /// <summary>Update menu items: the check item's label/enabled state, and the restart item (null hides it).</summary>
+    public void SetUpdateItems(string checkLabel, bool checkEnabled, string? restartLabel)
+    {
+        _checkUpdates.Text = checkLabel;
+        _checkUpdates.Enabled = checkEnabled;
+        _restartToUpdate.Visible = restartLabel is not null;
+        _restartToUpdate.Text = restartLabel ?? "";
+    }
+
+    public void ShowBalloon(string title, string text)
+    {
+        _icon.ShowBalloonTip(5000, title, text, WinForms.ToolTipIcon.Info);
+    }
+
     public void Update(CowpanionConfig config, string status)
     {
         _status.Text = status;
