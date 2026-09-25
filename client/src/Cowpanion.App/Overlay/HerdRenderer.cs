@@ -11,8 +11,8 @@ namespace Cowpanion.App.Overlay;
 /// <summary>
 /// Draws the herd onto a Canvas by writing transforms directly. One <see cref="CowVisual"/> per cow, created on
 /// spawn and removed on despawn; the per-tick path allocates nothing and touches only what changed.
-/// Lanes: a cow's <see cref="Cow.Position"/>.Y is a depth offset — the cow is drawn that many DIPs higher and behind
-/// front-lane cows (z-index). Emotes are procedural: Jump adds a vertical hop, Spin flips the facing rapidly.
+/// Every cow stands on the same ground line; a passing cow (<see cref="Cow.IsPassing"/>) walks through resting cows
+/// and is drawn behind them (z-index). Emotes are procedural: Jump adds a vertical hop, Spin flips the facing rapidly.
 /// </summary>
 internal sealed class HerdRenderer
 {
@@ -105,16 +105,16 @@ internal sealed class HerdRenderer
 
     /// <summary>
     /// Screen-space (strip DIP) rectangle of a cow's sprite, for bubbles, chat input placement and hit testing.
-    /// Follows the lane depth (so everything attached to the cow moves with it) but not the Jump hop.
+    /// Ignores the Jump hop.
     /// </summary>
     public Rect CowRect(Cow cow)
     {
         double w = CowWidthDips;
         double h = CowHeightDips;
-        return new Rect(cow.Position.X - w / 2, _groundY - h - Math.Round(cow.Position.Y), w, h);
+        return new Rect(cow.Position.X - w / 2, _groundY - h, w, h);
     }
 
-    /// <summary>The cow under <paramref name="p"/>; when rects overlap the front-most (lowest depth) cow wins.</summary>
+    /// <summary>The cow under <paramref name="p"/>; when rects overlap a resting cow (drawn in front) beats a passing one.</summary>
     public Cow? HitTest(Point p, HerdSimulator sim)
     {
         var cows = sim.Cows;
@@ -122,7 +122,7 @@ internal sealed class HerdRenderer
         for (int i = 0; i < cows.Count; i++)
         {
             var cow = cows[i];
-            if (CowRect(cow).Contains(p) && (best is null || cow.Position.Y < best.Position.Y))
+            if (CowRect(cow).Contains(p) && (best is null || (best.IsPassing && !cow.IsPassing)))
             {
                 best = cow;
             }
@@ -238,9 +238,8 @@ internal sealed class HerdRenderer
 
         double w = CowWidthDips;
         double h = CowHeightDips;
-        double depth = Math.Round(cow.Position.Y);
         double x = Math.Round(cow.Position.X - w / 2);
-        double y = _groundY - h - depth;
+        double y = _groundY - h;
         if (cow.Emote == CowEmote.Jump)
         {
             // Two hops over the emote: |sin| completes two arches per period.
@@ -257,8 +256,8 @@ internal sealed class HerdRenderer
             v.Move.Y = y;
         }
 
-        // Back-lane cows (larger depth) draw behind front-lane cows.
-        int z = BaseZ - (int)depth;
+        // Passing, arriving and leaving cows draw behind the resting cows they walk through.
+        int z = cow.IsPassing || cow.Lifecycle != CowLifecycle.Present ? BaseZ - 1 : BaseZ;
         if (z != v.LastZ)
         {
             Panel.SetZIndex(v.Image, z);

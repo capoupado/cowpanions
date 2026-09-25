@@ -17,8 +17,7 @@ public sealed class Cow
     public string Variant = "";
 
     /// <summary>
-    /// Feet position in DIPs relative to the strip. Y is the depth offset: 0 on the front lane, up to
-    /// <see cref="HerdSettings.LaneDepthDips"/> on the back lane (the renderer draws it that many DIPs higher and behind).
+    /// Feet position in DIPs relative to the strip. Only X moves; Y stays 0 (every cow stands on the same ground line).
     /// </summary>
     public Vec2 Position;
 
@@ -47,9 +46,6 @@ public sealed class Cow
     /// <summary>Set by the simulator for one tick when the cow enters Moo, so the app can play a sound.</summary>
     public bool MooTriggered;
 
-    /// <summary>0 = front lane (resting cows are always here), 1 = back passing lane. Position.Y follows it smoothly.</summary>
-    public int Lane;
-
     /// <summary>Set by the app's hit test via <see cref="HerdSimulator.SetHovered"/>: the cursor rests on this cow.</summary>
     public bool Hovered;
 
@@ -67,9 +63,6 @@ public sealed class Cow
     /// <summary>Speed multiplier applied to the current walk (spook = faster).</summary>
     public double WalkBoost = 1.0;
 
-    /// <summary>Seconds this walking cow has been pushed back against its heading.</summary>
-    public double BlockedTime;
-
     /// <summary>State to enter after Turn completes.</summary>
     public CowState AfterTurn = CowState.Walk;
 
@@ -79,7 +72,7 @@ public sealed class Cow
     /// <summary>Accumulates time toward the next once-a-second cursor reaction roll.</summary>
     public double CursorRollAccumulator;
 
-    /// <summary>X after movement but before the separation pass this tick (push budget and blocked detection).</summary>
+    /// <summary>X after movement but before the separation pass this tick (push budget).</summary>
     public double PreSeparationX;
 
     /// <summary>Destination X of the current wander; valid when <see cref="HasTarget"/>.</summary>
@@ -89,16 +82,13 @@ public sealed class Cow
     public bool HasTarget;
 
     /// <summary>
-    /// Seconds spent, this walk, idling at back-lane spots that turned out to be taken (or with no gap in sight)
-    /// after the walk wanted to end in lane 1. Past the budget the cow rests in lane 1 until the front is clear.
+    /// Seconds spent, this walk, standing at spots that turned out to be taken (or with no gap in sight) after the
+    /// walk wanted to end on top of a resting cow. Past the budget the cow rests there and separation eases them apart.
     /// </summary>
-    public double LaneExtendSeconds;
+    public double GapSeekSeconds;
 
-    /// <summary>True while <see cref="TargetX"/> is the nearest front-lane gap rather than a wander destination.</summary>
-    public bool LaneExtending;
-
-    /// <summary>Blocked turn-arounds suffered on the current journey; after a few the destination is given up.</summary>
-    public int TargetBlockedTurns;
+    /// <summary>True while <see cref="TargetX"/> is the nearest free resting spot rather than a wander destination.</summary>
+    public bool SeekingGap;
 
     /// <summary>Cool-down before a fast cursor can startle this cow again.</summary>
     public double StartleCooldown;
@@ -107,6 +97,13 @@ public sealed class Cow
     public double PendingWalkBoost = 1.0;
 
     public double PendingWalkDuration;
+
+    /// <summary>
+    /// A cow on the move (walking, or turning to walk on). It walks straight through other cows at ground level;
+    /// separation only holds between cows that are not passing.
+    /// </summary>
+    public bool IsPassing => Lifecycle == CowLifecycle.Present
+        && (State == CowState.Walk || (State == CowState.Turn && AfterTurn == CowState.Walk));
 
     public bool IsStationary => State != CowState.Walk && Lifecycle == CowLifecycle.Present;
 

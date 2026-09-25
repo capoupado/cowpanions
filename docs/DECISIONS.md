@@ -268,3 +268,18 @@ client plan's "no auto-update" hard rule and "auto-update" in its permanently-ou
 - **Version**: the GitHub release tagged v1.0.0 actually ships Velopack package 0.2.0 (the feed and every
   install report 0.2.0). This release is **1.1.0**, which is above both, so installs update and the
   package version lines up with the tags from here on.
+
+## 2026-09-25 — Walkers pass through each other at ground level (passing lane removed)
+
+- **Owner found the passing lane odd**: a blocked walker rising 14 DIPs into a back lane read as cows
+  "moving up" when passing. Replaced (supersedes the passing-lane part of the 2026-09-07 round):
+  **walking cows pass straight through other cows on the same ground line**, drawn behind the resting
+  cow they cross. Nothing ever moves on the Y axis now except the Jump emote.
+- **Separation only holds between resting cows** (anything not walking, or turning to walk on:
+  `Cow.IsPassing`). Resting cows still never overlap; walkers are never pushed, never blocked, so the
+  "blocked walker turns around" rule and its three-retries budget are gone too.
+- **Stopping**: a walk that would end on top of a resting cow carries on to the nearest free spot
+  (prefers ahead, no U-turn), with the same bounded 6 s budget as before; past it the cow rests and
+  separation eases the two apart at the usual capped push speed.
+- `HerdSettings.LaneDepthDips` / `LaneChangeDipsPerSecond` and `Cow.Lane` removed. Hover picks the
+  resting cow when a walker overlaps it (it is the one drawn in front).

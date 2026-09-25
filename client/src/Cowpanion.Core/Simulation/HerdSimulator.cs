@@ -37,18 +37,16 @@ public sealed class HerdSimulator
     /// <summary>Minimum wander distance as a fraction of the walkable width.</summary>
     private const double MinWanderFraction = 0.3;
 
-    /// <summary>Extra clearance (beyond MinGap) before a back-lane cow drops back to the front lane; avoids flapping.</summary>
-    private const double LaneReturnMarginDips = 8.0;
+    /// <summary>Extra clearance (beyond MinGap) a walker needs from resting cows before it may stop; avoids flapping.</summary>
+    private const double RestClearanceMarginDips = 8.0;
 
     /// <summary>
-    /// Budget of extra walking a back-lane cow may spend standing at front-lane spots that turned out to be taken
-    /// (or with no gap at all) before it gives up and rests in the back lane until the front clears. Walking toward
-    /// an unfinished destination or a known gap does not count against it.
+    /// Budget of extra walking a cow may spend standing at spots that turned out to be taken (or with no gap at all)
+    /// when its walk wants to end on top of a resting cow. Past it the cow rests where it is and separation eases the
+    /// two apart. Walking toward an unfinished destination or a known gap does not count against it.
     /// </summary>
-    private const double LaneExtendMaxSeconds = 6.0;
+    private const double GapSeekMaxSeconds = 6.0;
 
-    private const double BlockedTurnSeconds = 0.35;
-    private const int MaxBlockedTurnsPerJourney = 3;
     private const double HoverLookUpSeconds = 0.4;
     private const double StartleCooldownSeconds = 5.0;
     private const double SpookBoost = 2.2;
@@ -439,86 +437,8 @@ public sealed class HerdSimulator
         {
             _cows[i].PreSeparationX = _cows[i].Position.X;
         }
-        Separate(deltaSeconds, lane: 0);
-        Separate(deltaSeconds, lane: 1);
-
-        // Back-lane cows drop to the front lane as soon as it is clear around them (resting cows belong in front).
-        for (int i = 0; i < _cows.Count; i++)
-        {
-            var cow = _cows[i];
-            if (cow.Lifecycle == CowLifecycle.Present && cow.Lane == 1 && LaneClearAround(cow, 0, _settings.MinGapDips + LaneReturnMarginDips))
-            {
-                cow.Lane = 0;
-                cow.LaneExtendSeconds = 0;
-                cow.LaneExtending = false;
-            }
-        }
-
-        // Blocked walkers step into the back lane to pass; if that lane is taken, they turn around instead of moonwalking.
-        for (int i = 0; i < _cows.Count; i++)
-        {
-            var cow = _cows[i];
-            if (cow.Lifecycle != CowLifecycle.Present || cow.State != CowState.Walk)
-            {
-                cow.BlockedTime = 0;
-                continue;
-            }
-            double pushed = cow.Position.X - cow.PreSeparationX;
-            bool againstHeading = (cow.Facing > 0 && pushed < -0.01) || (cow.Facing < 0 && pushed > 0.01);
-            if (!againstHeading)
-            {
-                cow.BlockedTime = 0;
-                continue;
-            }
-            cow.BlockedTime += deltaSeconds;
-            if (cow.BlockedTime <= BlockedTurnSeconds)
-            {
-                continue;
-            }
-            cow.BlockedTime = 0;
-            if (cow.Lane == 0 && LaneClearAround(cow, 1, _settings.MinGapDips))
-            {
-                cow.Lane = 1;
-                cow.LaneExtendSeconds = 0;
-                cow.LaneExtending = false;
-            }
-            else
-            {
-                bool retry = cow.HasTarget && !cow.LaneExtending && cow.TargetBlockedTurns < MaxBlockedTurnsPerJourney;
-                cow.LaneExtending = false;
-                cow.AfterTurn = CowState.Walk;
-                EnterState(cow, CowState.Turn);
-                if (retry)
-                {
-                    // Keep the destination: step back briefly, rest, and try again once the way has cleared.
-                    cow.TargetBlockedTurns++;
-                    cow.PendingWalkBoost = 1.0;
-                    cow.PendingWalkDuration = 0.8 + _rng.NextDouble() * 0.8;
-                }
-                else
-                {
-                    cow.HasTarget = false;
-                }
-            }
-        }
-
-        // Depth follows the lane at a bounded rate: a lane change is a glide, never a pop.
-        double maxStepY = _settings.LaneChangeDipsPerSecond * deltaSeconds;
-        for (int i = 0; i < _cows.Count; i++)
-        {
-            var cow = _cows[i];
-            double targetY = cow.Lane * _settings.LaneDepthDips;
-            double dy = targetY - cow.Position.Y;
-            if (dy > maxStepY)
-            {
-                dy = maxStepY;
-            }
-            else if (dy < -maxStepY)
-            {
-                dy = -maxStepY;
-            }
-            cow.Position.Y += dy;
-        }
+        // Walkers pass straight through other cows at ground level; only resting cows keep their distance.
+        Separate(deltaSeconds);
 
         // Despawn cows that have fully left. Iterate backwards; RemoveAt allocates nothing.
         for (int i = _cows.Count - 1; i >= 0; i--)
@@ -597,8 +517,8 @@ public sealed class HerdSimulator
         cow.Lifecycle = CowLifecycle.Leaving;
         cow.HasBubble = false;
         cow.HasTarget = false;
-        cow.Lane = 0;
-        cow.LaneExtendSeconds = 0;
+        cow.GapSeekSeconds = 0;
+        cow.SeekingGap = false;
         cow.Emote = CowEmote.None;
         cow.EmoteElapsed = 0;
         bool leftIsNearer = cow.Position.X < _width / 2;
@@ -705,20 +625,19 @@ public sealed class HerdSimulator
         }
         cow.TargetX = target;
         cow.HasTarget = true;
-        cow.LaneExtending = false;
-        cow.TargetBlockedTurns = 0;
+        cow.SeekingGap = false;
         return true;
     }
 
     private double WalkSpeed(Cow cow) => _settings.BaseSpeedDips * cow.Personality.SpeedMultiplier * cow.WalkBoost;
 
-    /// <summary>True when no other present cow in <paramref name="lane"/> is within <paramref name="clearance"/> of this cow's X.</summary>
-    private bool LaneClearAround(Cow cow, int lane, double clearance)
+    /// <summary>True when no other resting (present, not passing) cow is within <paramref name="clearance"/> of this cow's X.</summary>
+    private bool RestingClearAround(Cow cow, double clearance)
     {
         for (int i = 0; i < _cows.Count; i++)
         {
             var other = _cows[i];
-            if (ReferenceEquals(other, cow) || other.Lifecycle != CowLifecycle.Present || other.Lane != lane)
+            if (ReferenceEquals(other, cow) || other.Lifecycle != CowLifecycle.Present || other.IsPassing)
             {
                 continue;
             }
@@ -906,25 +825,23 @@ public sealed class HerdSimulator
                 }
                 if (reached || cow.StateElapsed >= cow.StateDuration)
                 {
-                    bool overSomebody = cow.Lane == 1 && !LaneClearAround(cow, 0, _settings.MinGapDips + LaneReturnMarginDips);
-                    if (overSomebody && cow.HasTarget && !cow.LaneExtending)
+                    bool overSomebody = !RestingClearAround(cow, _settings.MinGapDips + RestClearanceMarginDips);
+                    if (overSomebody && cow.HasTarget && !cow.SeekingGap)
                     {
                         // The walk timed out mid-pass with the journey unfinished: carry on toward the destination.
-                        // The drop back to lane 0 happens the tick the blocker is behind.
                         cow.StateDuration = cow.StateElapsed + 0.25;
                     }
-                    else if (overSomebody && (cow.LaneExtendSeconds < LaneExtendMaxSeconds || (cow.LaneExtending && !reached)))
+                    else if (overSomebody && (cow.GapSeekSeconds < GapSeekMaxSeconds || (cow.SeekingGap && !reached)))
                     {
-                        // Still in the passing lane over somebody: head for the nearest clear spot in front instead of
-                        // stopping here (the drop back to lane 0 happens the tick it is clear). Arriving at a spot
-                        // that got taken meanwhile, or finding none, burns a bounded budget of short extensions
-                        // before the cow gives up and rests in the back lane until the front clears.
-                        if (!(cow.LaneExtending && reached) && FindNearestFrontGap(cow, out double gapX)
+                        // Standing on top of a resting cow: head for the nearest clear spot instead of stopping here.
+                        // Arriving at a spot that got taken meanwhile, or finding none, burns a bounded budget of
+                        // short extensions before the cow gives up and rests here (separation eases them apart).
+                        if (!(cow.SeekingGap && reached) && FindNearestRestingGap(cow, out double gapX)
                             && Math.Abs(gapX - cow.Position.X) > TargetReachDips)
                         {
                             cow.TargetX = gapX;
                             cow.HasTarget = true;
-                            cow.LaneExtending = true;
+                            cow.SeekingGap = true;
                             int desired = gapX < cow.Position.X ? -1 : 1;
                             if (desired != cow.Facing)
                             {
@@ -936,9 +853,9 @@ public sealed class HerdSimulator
                             break;
                         }
                         const double extend = 0.25;
-                        cow.LaneExtending = false;
+                        cow.SeekingGap = false;
                         cow.StateDuration = cow.StateElapsed + extend;
-                        cow.LaneExtendSeconds += extend;
+                        cow.GapSeekSeconds += extend;
                     }
                     else
                     {
@@ -995,18 +912,9 @@ public sealed class HerdSimulator
         {
             // Wander: keep an unfinished destination, otherwise pick one well away from here (sociable cows
             // sometimes aim near the herd), and face it. A Turn precedes the walk when it is behind the cow.
-            cow.LaneExtendSeconds = 0;
-            cow.LaneExtending = false;
+            cow.GapSeekSeconds = 0;
+            cow.SeekingGap = false;
             bool haveTarget = cow.HasTarget && Math.Abs(cow.TargetX - cow.Position.X) > TargetReachDips;
-            if (cow.Lane == 1 && !LaneClearAround(cow, 0, _settings.MinGapDips + LaneReturnMarginDips)
-                && FindNearestFrontGap(cow, out double frontX) && Math.Abs(frontX - cow.Position.X) > TargetReachDips)
-            {
-                // A cow that rested in the back lane comes forward first.
-                cow.TargetX = frontX;
-                cow.HasTarget = true;
-                cow.LaneExtending = true;
-                haveTarget = true;
-            }
             if (!haveTarget)
             {
                 haveTarget = PickWanderTarget(cow, meanX, social: true);
@@ -1038,13 +946,13 @@ public sealed class HerdSimulator
         EnterState(cow, next);
     }
 
-    /// <summary>Fills <see cref="_order"/> with the present cows of one lane sorted by X (insertion sort, no allocation). Returns the count.</summary>
-    private int SortLane(int lane)
+    /// <summary>Fills <see cref="_order"/> with the resting (present, not passing) cows sorted by X (insertion sort, no allocation). Returns the count.</summary>
+    private int SortResting()
     {
         int n = 0;
         for (int i = 0; i < _cows.Count; i++)
         {
-            if (_cows[i].Lifecycle == CowLifecycle.Present && _cows[i].Lane == lane)
+            if (_cows[i].Lifecycle == CowLifecycle.Present && !_cows[i].IsPassing)
             {
                 _order[n++] = i;
             }
@@ -1065,14 +973,13 @@ public sealed class HerdSimulator
     }
 
     /// <summary>
-    /// Nearest X at which <paramref name="cow"/> could stand in the front lane without another front-lane cow
-    /// within the return clearance. Prefers a spot ahead (no U-turn) unless the one behind is much closer.
-    /// False only when the front lane is packed solid.
+    /// Nearest X at which <paramref name="cow"/> could rest without a resting cow within the rest clearance.
+    /// Prefers a spot ahead (no U-turn) unless the one behind is much closer. False only when the strip is packed solid.
     /// </summary>
-    private bool FindNearestFrontGap(Cow cow, out double gapX)
+    private bool FindNearestRestingGap(Cow cow, out double gapX)
     {
-        double clearance = _settings.MinGapDips + LaneReturnMarginDips;
-        int n = SortLane(0);
+        double clearance = _settings.MinGapDips + RestClearanceMarginDips;
+        int n = SortResting();
         double x = cow.Position.X;
         double ahead = double.NaN, behind = double.NaN;
         double aheadDistance = double.MaxValue, behindDistance = double.MaxValue;
@@ -1110,13 +1017,13 @@ public sealed class HerdSimulator
     }
 
     /// <summary>
-    /// Hard separation for present cows in one lane: sort by X (insertion sort into a preallocated index array),
+    /// Hard separation for resting cows (walkers pass through): sort by X (insertion sort into a preallocated index array),
     /// sweep so neighbours are at least MinGap apart, keep everything inside the bounds. Displacement per tick is
     /// capped so no cow ever jumps; the constraint converges within a fraction of a second.
     /// </summary>
-    private void Separate(double dt, int lane)
+    private void Separate(double dt)
     {
-        int n = SortLane(lane);
+        int n = SortResting();
         if (n < 2)
         {
             return;

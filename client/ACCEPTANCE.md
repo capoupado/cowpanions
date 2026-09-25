@@ -59,7 +59,7 @@ the published exe against the (still v1) deployed server logged close 4000 once,
 
 ## P2 — The herd
 
-- [ ] Six cows never visually overlap — **automated: pass** (`Six_cows_never_visually_overlap`: 10 simulated minutes, centre gap ≥ cow width every tick). **observed**: six cows, no overlap in two screenshots.
+- [ ] Six cows never visually overlap — **automated: pass** (`Resting_cows_never_overlap_and_every_cow_stays_on_the_ground`: 10 simulated minutes, centre gap ≥ cow width between resting cows every tick; walkers pass through by design since 2026-09-25). **observed**: six cows, no overlap in two screenshots.
 - [ ] Cows sometimes cluster, sometimes spread — **automated: pass** (`Cows_both_cluster_and_spread_over_time`: spread varies by > 300 DIPs over 20 simulated minutes).
 - [ ] Editing `offlineHerdSize` takes effect within ~1 s — **automated: pass** for the mechanism (`ConfigTests.External_edit_raises_Changed_after_debounce_but_own_save_does_not`). **manual: to verify** end-to-end: edit config.json in Notepad, save; new cows walk in / surplus cows walk out within about a second.
 - [ ] Correct placement and scale on a second monitor with different DPI — **manual: to verify**: set `"monitors": "all"`, confirm each strip hugs its own taskbar and cows are the same physical-ish size. (`MonitorInfo` uses `GetDpiForMonitor`; `OverlayWindow.Place` uses physical pixels.) Only one monitor was available here.
@@ -103,7 +103,7 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
 - [ ] **Hover name tag** — resting the cursor on a cow for ~0.4 s shows a small label above it (member name, "cow"
   for fillers, "(you)" suffix on the own cow); it fades in/out over 120 ms, follows the cow, hides while that cow has a
   bubble or is leaving. `Overlay/HoverLabelRenderer.cs`; hit test in `Orchestrator.OnTick` → `HerdRenderer.HitTest`
-  (front lane wins when rects overlap) → `HerdSimulator.SetHovered`. Cursor is read via `GetCursorPos`; the label is
+  (the resting cow wins when a walker overlaps it) → `HerdSimulator.SetHovered`. Cursor is read via `GetCursorPos`; the label is
   `IsHitTestVisible=false` and the window stays `WS_EX_TRANSPARENT`. **automated: pass** for the hover timer (Core
   `HerdSimulatorTests`, hover tests). **manual: to verify** — hover a cow: tag after ~0.4 s, gone when the cursor
   leaves; click through it onto the desktop while it shows; hover a cow whose bubble is up: no tag.
@@ -111,12 +111,12 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   short spooked walk away; a hovered relaxed cow looks up (idle2 row). **automated: pass** (Core `HerdSimulatorTests`
   startle/hover tests). **manual: to verify** — flick the mouse across the herd: nearby cows trot off, and the same cow
   is not startled again for a few seconds.
-- [ ] **Lanes and roaming** — cows pick wander destinations anywhere on the strip; a walker blocked by a stationary
-  cow steps into the back lane (drawn 14 DIPs higher and behind: `HerdRenderer` z-index = 100 − depth), passes, and
-  returns to the front lane. Resting cows are always in the front lane. **automated: pass** (Core lane / wander tests;
-  `Six_cows_never_visually_overlap` now means "never within the same lane"). **manual: to verify** — watch for 5
-  minutes: your own cow visits both halves of the screen; a passing cow is drawn behind and slightly higher, never
-  overlapping a front cow in its own lane; bubbles, the chat input and the hover tag follow the raised cow.
+- [ ] **Passing and roaming** — cows pick wander destinations anywhere on the strip; a walker passes straight through
+  other cows on the same ground line (drawn behind the resting cow it crosses: `HerdRenderer` z-index 99 vs 100) and
+  never rests on top of one; nothing moves on the Y axis except the Jump emote. **automated: pass** (Core
+  `Walker_passes_through_a_resting_cow_at_ground_level`, `Walker_whose_destination_is_taken_rests_beside_the_cow_instead`,
+  roaming tests). **manual: to verify** — watch for 5 minutes: your own cow visits both halves of the screen; a passing
+  cow walks behind the others without rising, and every cow that stops stands clear of its neighbours.
 - [ ] **Emotes** — `/moo`, `/jump`, `/spin` in the chat box (text after the command is sent alongside as a bubble).
   Moo plays the moo row (and the sound hook when `mooEnabled`); Jump is two 22-DIP hops over 1 s; Spin flips the
   rendered facing every 125 ms for 1 s. The simulator holds the cow still; `HerdRenderer.Update` draws the flourish.
