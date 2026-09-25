@@ -139,8 +139,8 @@ public static partial class ConfigValidator
 
     /// <summary>
     /// Canonicalises each binding ("ctrl + alt + c" → "Ctrl+Alt+C"). Unparseable → that action's default; Kill may not
-    /// be empty. A combination used twice keeps the first action in the order Kill, Chat, Mute, Heart, FocusMode and
-    /// unbinds the later one.
+    /// be empty. A combination used twice keeps the first action in the order Kill, Chat, Mute, Heart, FocusMode, Jump
+    /// and unbinds the later one. Jump is last because it was added later (v1.1): an existing binding never loses to it.
     /// </summary>
     private static void ClampHotkeys(CowpanionConfig c, List<string> warnings)
     {
@@ -156,6 +156,7 @@ public static partial class ConfigValidator
         h.Mute = ClampBinding(h.Mute, HotkeyBindings.DefaultMute, "mute", allowEmpty: true, seen, warnings);
         h.Heart = ClampBinding(h.Heart, HotkeyBindings.DefaultHeart, "heart", allowEmpty: true, seen, warnings);
         h.FocusMode = ClampBinding(h.FocusMode, HotkeyBindings.DefaultFocusMode, "focusMode", allowEmpty: true, seen, warnings);
+        h.Jump = ClampBinding(h.Jump, HotkeyBindings.DefaultJump, "jump", allowEmpty: true, seen, warnings);
     }
 
     private static string ClampBinding(string? value, string fallback, string name, bool allowEmpty, HashSet<Hotkey> seen, List<string> warnings)

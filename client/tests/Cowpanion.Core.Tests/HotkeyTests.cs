@@ -77,6 +77,7 @@ public class HotkeyTests : IDisposable
         Assert.Equal("Ctrl+Alt+M", cfg.Hotkeys.Mute);
         Assert.Equal("Ctrl+Alt+H", cfg.Hotkeys.Heart);
         Assert.Equal("Ctrl+Alt+F", cfg.Hotkeys.FocusMode);
+        Assert.Equal("Ctrl+Alt+J", cfg.Hotkeys.Jump);
         Assert.False(cfg.FocusMode);
         using var doc = JsonDocument.Parse(File.ReadAllText(ConfigPath));
         Assert.Equal("Ctrl+Alt+C", doc.RootElement.GetProperty("hotkeys").GetProperty("chat").GetString());
@@ -113,6 +114,39 @@ public class HotkeyTests : IDisposable
         Assert.Equal("Ctrl+Alt+M", cfg.Hotkeys.Mute);
         Assert.Equal("", cfg.Hotkeys.Heart);
         Assert.Equal(2, warnings.Count(w => w.Contains("already used", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Pre_jump_config_gets_the_jump_default_but_never_steals_an_existing_binding()
+    {
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(ConfigPath, """
+            { "hotkeys": { "kill": "Ctrl+Alt+Shift+K", "chat": "Ctrl+Alt+C", "mute": "Ctrl+Alt+M", "heart": "Ctrl+Alt+H", "focusMode": "Ctrl+Alt+F" } }
+            """);
+        using (var store = new ConfigStore(ConfigPath))
+        {
+            Assert.Equal("Ctrl+Alt+J", store.Load().Hotkeys.Jump);
+        }
+
+        var cfg = new CowpanionConfig();
+        cfg.Hotkeys.FocusMode = "ctrl+alt+j";
+        var warnings = ConfigValidator.Clamp(cfg);
+        Assert.Equal("Ctrl+Alt+J", cfg.Hotkeys.FocusMode);
+        Assert.Equal("", cfg.Hotkeys.Jump);
+        Assert.Contains(warnings, w => w.Contains("hotkeys.jump", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Jump_can_be_rebound_and_unbound()
+    {
+        var cfg = new CowpanionConfig();
+        cfg.Hotkeys.Jump = "shift + f9";
+        ConfigValidator.Clamp(cfg);
+        Assert.Equal("Shift+F9", cfg.Hotkeys.Jump);
+        cfg.Hotkeys.Jump = "  ";
+        ConfigValidator.Clamp(cfg);
+        Assert.Equal("", cfg.Hotkeys.Jump);
+        Assert.False(new HotkeyBindings().SameAs(cfg.Hotkeys));
     }
 
     [Fact]

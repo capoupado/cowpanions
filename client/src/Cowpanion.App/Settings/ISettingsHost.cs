@@ -12,7 +12,7 @@ internal interface ISettingsHost
 
     string AppVersion { get; }
 
-    /// <summary>Hotkey action name ("kill", "chat", "mute", "heart", "focusMode") → why it is not registered.</summary>
+    /// <summary>Hotkey action name ("kill", "chat", "mute", "heart", "jump", "focusMode") → why it is not registered.</summary>
     IReadOnlyDictionary<string, string> HotkeyErrors { get; }
 
     /// <summary>Mutates a copy of the live config, clamps, saves and applies it. Returns the clamp corrections.</summary>

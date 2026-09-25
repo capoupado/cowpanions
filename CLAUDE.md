@@ -48,6 +48,55 @@ dotnet test Cowpanion.sln -c Release                  # Core 72, Net 63 (Net tak
 bash /opt/cowpanion/server/deploy/install.sh
 ```
 
+## Publishing a client release (build + upload a new version)
+
+```powershell
+cd client
+.\release.ps1 -Version 0.2.0      # builds Release, vpk pack (full + delta), fetches the previous release
+                                   # for the delta base, writes ..\dist\releases\ + ..\dist\RELEASE_NOTES.md:
+                                   # Cowpanion-win-Setup.exe, Cowpanion-win-Portable.zip, full+delta .nupkg,
+                                   # releases.win.json, assets.win.json, SHA256SUMS.txt. Never uploads anything.
+```
+
+Then upload by hand, packages before the feed file so no client ever sees a release whose package
+is missing (full commands: `server/deploy/RUNBOOK.md` §7):
+
+1. GitHub release — asset names must match exactly, the site's download buttons hardcode them:
+   ```powershell
+   gh release create v0.2.0 ..\dist\releases\Cowpanion-win-Setup.exe ..\dist\releases\Cowpanion-win-Portable.zip ..\dist\releases\SHA256SUMS.txt --title v0.2.0 --notes-file ..\dist\RELEASE_NOTES.md
+   ```
+2. Update feed on the VPS — new package(s) first, then the feed files:
+   ```powershell
+   scp ..\dist\releases\Cowpanion-0.2.0-*.nupkg root@<vps>:/var/www/cows-updates/
+   scp ..\dist\releases\releases.win.json ..\dist\releases\assets.win.json root@<vps>:/var/www/cows-updates/
+   ```
+3. Verify: `curl -sI https://cows.carlospoupado.com/updates/releases.win.json` → `200`,
+   `cache-control: no-cache`. Running clients pick it up within a day (or tray → Check for
+   updates), download in the background, install on next restart.
+
+Keep `dist\releases` between releases — it is the delta base; if lost, `release.ps1` re-downloads
+the previous release from the feed. Rollback = publish the previous build under a *higher* version
+number (Velopack never downgrades). Delete old `.nupkg` on the VPS once nobody runs that version;
+the newest full package must stay. Test the whole update path with a throwaway pack id first
+(client/README "Releases and updates") — never the real `Cowpanion` pack id on this machine.
+
+## Restarting / redeploying the server
+
+Quick restart, no code change, on the VPS as root:
+```bash
+systemctl restart cowpanion && sleep 2 && systemctl status cowpanion --no-pager
+journalctl -u cowpanion -n 20 --no-pager      # confirm it came back up clean
+```
+Drops every connected client; they reconnect with jittered backoff by design — not a bug to
+work around.
+
+Full redeploy — pulls `main`, `npm ci --omit=dev`, reinstalls the systemd unit + nginx site +
+static site + logrotate rule, restarts (idempotent, safe to re-run any time, including just to
+pick up a config change with no code change):
+```bash
+sudo bash /opt/cowpanion/server/deploy/install.sh
+```
+
 ## Invariants (release blockers — see client plan "Hard rules")
 
 Overlay never takes focus, never in Alt-Tab, click-through except while chat mode is armed

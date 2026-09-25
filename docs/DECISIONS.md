@@ -255,3 +255,16 @@ client plan's "no auto-update" hard rule and "auto-update" in its permanently-ou
   `release.ps1` publishes (self-contained, no longer single-file: Velopack packs a folder and makes
   ~90 KB deltas from it), fetches the previous release for deltas, packs, writes SHA256SUMS and prints
   the upload commands. It never uploads.
+
+## 2026-09-25 — Jump hotkey (v1.1.0, first update pushed through the Velopack feed)
+
+- **Ctrl+Alt+J makes your own cow jump**, rebindable/unbindable like the others (`hotkeys.jump`,
+  Settings → Hotkeys, tray "Jump"). No protocol change: it sends the existing v2 `jump` emote
+  (`{"t":"chat","emote":"jump"}`), so everyone in the pasture sees it and the server echo animates our own
+  cow (never optimistically). Offline or multiplayer off, the own cow jumps locally only.
+- **Clamp order**: Jump is checked *after* FocusMode, so on upgrade an existing binding that already uses
+  Ctrl+Alt+J keeps it and jump starts unbound (with a warning) instead of stealing it.
+- Released in focus mode like the other non-essential hotkeys.
+- **Version**: the GitHub release tagged v1.0.0 actually ships Velopack package 0.2.0 (the feed and every
+  install report 0.2.0). This release is **1.1.0**, which is above both, so installs update and the
+  package version lines up with the tags from here on.

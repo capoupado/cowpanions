@@ -87,7 +87,7 @@ A small diagnostic log lives next to it in `cowpanion.log` (never contains chat 
 | `bubblesEnabled` / `bubblesMuted` | `true` / `false` | mute is toggled by the mute hotkey and persists |
 | `offlineHerdSize` | `4` | filler cows when multiplayer is off or unreachable (0–12) |
 | `variant` | `""` | cow colour; empty = derived from `clientId` once and saved. Tray → Cow colour |
-| `hotkeys` | see below | `kill`, `chat`, `mute`, `heart`, `focusMode`, each a combination like `"Ctrl+Alt+C"`; `""` unbinds (not allowed for `kill`) |
+| `hotkeys` | see below | `kill`, `chat`, `mute`, `heart`, `jump`, `focusMode`, each a combination like `"Ctrl+Alt+C"`; `""` unbinds (not allowed for `kill`) |
 | `focusMode` | `false` | release every hotkey except `kill` and `focusMode`; persists until turned off |
 | `autoCheckForUpdates` | `true` | installed builds: check the update feed 45 s after start and every 24 h |
 
@@ -111,11 +111,12 @@ the log; if the quit combination is taken the app falls back to `Ctrl+Alt+Shift+
 | `Ctrl+Alt+C` | arm chat mode: input appears near your cow; Enter sends, Esc cancels, 8 s idle or a click elsewhere disarms |
 | `Ctrl+Alt+M` | mute/unmute speech bubbles (persisted) |
 | `Ctrl+Alt+H` | send a heart reaction |
+| `Ctrl+Alt+J` | your cow jumps (a `jump` emote everyone sees; offline, only your own screen) |
 | `Ctrl+Alt+F` | focus mode on/off: while on, only quit and this toggle stay registered |
 
 ## Tray menu
 
-Status line · Multiplayer on/off · Mute bubbles · Send a heart · Chat history… · Focus mode · Cow colour ▸
+Status line · Multiplayer on/off · Mute bubbles · Send a heart · Jump · Chat history… · Focus mode · Cow colour ▸
 (seven variants) · Filler herd + / − · Start with Windows · Settings… · Check for updates (shows the version) ·
 Restart to update (only when one is downloaded) · Open config.json · Reload config.json · Quit.
 Labels show the current hotkey. Double-clicking the icon opens Settings.

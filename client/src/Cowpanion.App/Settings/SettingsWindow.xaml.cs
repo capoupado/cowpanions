@@ -46,6 +46,7 @@ public partial class SettingsWindow : Window
         AddRow("chat", "Chat", HotkeyBindings.DefaultChat, allowEmpty: true);
         AddRow("mute", "Mute bubbles", HotkeyBindings.DefaultMute, allowEmpty: true);
         AddRow("heart", "Send a heart", HotkeyBindings.DefaultHeart, allowEmpty: true);
+        AddRow("jump", "Jump", HotkeyBindings.DefaultJump, allowEmpty: true);
         AddRow("focusMode", "Toggle focus mode", HotkeyBindings.DefaultFocusMode, allowEmpty: true);
 
         LoadFrom(config);
@@ -81,7 +82,8 @@ public partial class SettingsWindow : Window
         _rows[1].Set(c.Hotkeys.Chat);
         _rows[2].Set(c.Hotkeys.Mute);
         _rows[3].Set(c.Hotkeys.Heart);
-        _rows[4].Set(c.Hotkeys.FocusMode);
+        _rows[4].Set(c.Hotkeys.Jump);
+        _rows[5].Set(c.Hotkeys.FocusMode);
         FocusModeBox.IsChecked = c.FocusMode;
     }
 
@@ -168,7 +170,8 @@ public partial class SettingsWindow : Window
             c.Hotkeys.Chat = hotkeys[1];
             c.Hotkeys.Mute = hotkeys[2];
             c.Hotkeys.Heart = hotkeys[3];
-            c.Hotkeys.FocusMode = hotkeys[4];
+            c.Hotkeys.Jump = hotkeys[4];
+            c.Hotkeys.FocusMode = hotkeys[5];
             c.FocusMode = FocusModeBox.IsChecked == true;
         });
 

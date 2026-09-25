@@ -148,6 +148,7 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         _tray.VariantSelected += v => Mutate(c => c.Variant = v);
         _tray.MuteToggled += ToggleMute;
         _tray.HeartRequested += SendHeart;
+        _tray.JumpRequested += SendJump;
         _tray.MultiplayerToggled += () => Mutate(c => c.MultiplayerEnabled = !c.MultiplayerEnabled);
         _tray.StartupToggled += () => Mutate(c => c.StartWithWindows = !c.StartWithWindows);
         _tray.FocusModeToggled += ToggleFocusMode;
@@ -462,6 +463,7 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
         RegisterBinding("chat", h.Chat, ArmChat);
         RegisterBinding("mute", h.Mute, ToggleMute);
         RegisterBinding("heart", h.Heart, SendHeart);
+        RegisterBinding("jump", h.Jump, SendJump);
     }
 
     /// <summary>Empty text = unbound, which counts as success.</summary>
@@ -509,6 +511,51 @@ internal sealed class Orchestrator : ISettingsHost, IDisposable
             return;
         }
         _ = SendReactionSafelyAsync(client, "❤️");
+    }
+
+    /// <summary>
+    /// Ctrl+Alt+J / tray: our cow jumps. Connected → a "jump" emote to the pasture; the server echo animates it on every
+    /// screen, ours included (never optimistically). Offline or multiplayer off → our own cow jumps here only.
+    /// </summary>
+    private void SendJump()
+    {
+        if (_suspended)
+        {
+            return;
+        }
+        var client = _client;
+        if (client is not null && client.State == ConnectionState.Connected)
+        {
+            _ = SendEmoteSafelyAsync(client, "jump");
+            return;
+        }
+        for (int i = 0; i < _strips.Count; i++)
+        {
+            var sim = _strips[i].Simulator;
+            var self = sim.FindSelf();
+            if (self is not null)
+            {
+                sim.NotifyActivity();
+                sim.TriggerEmote(self, CowEmote.Jump);
+                return;
+            }
+        }
+        AppLog.Info("jump: no own cow on screen");
+    }
+
+    private static async Task SendEmoteSafelyAsync(PastureClient client, string emote)
+    {
+        try
+        {
+            if (!await client.SendChatAsync("", emote, ""))
+            {
+                AppLog.Info("emote not sent: not connected");
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Info("emote send failed: " + ex.GetType().Name);
+        }
     }
 
     private static async Task SendReactionSafelyAsync(PastureClient client, string reaction)

@@ -15,6 +15,7 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _multiplayer = new("Multiplayer") { CheckOnClick = false };
     private readonly WinForms.ToolStripMenuItem _mute = new("Mute bubbles");
     private readonly WinForms.ToolStripMenuItem _heart = new("Send a heart");
+    private readonly WinForms.ToolStripMenuItem _jump = new("Jump");
     private readonly WinForms.ToolStripMenuItem _focus = new("Focus mode");
     private readonly WinForms.ToolStripMenuItem _history = new("Chat history…");
     private readonly WinForms.ToolStripMenuItem _settings = new("Settings…");
@@ -37,6 +38,7 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(_multiplayer);
         _menu.Items.Add(_mute);
         _menu.Items.Add(_heart);
+        _menu.Items.Add(_jump);
         _menu.Items.Add(_history);
         _menu.Items.Add(_focus);
         _menu.Items.Add(_colour);
@@ -64,6 +66,7 @@ internal sealed class TrayIconHost : IDisposable
         _multiplayer.Click += (_, _) => MultiplayerToggled?.Invoke();
         _mute.Click += (_, _) => MuteToggled?.Invoke();
         _heart.Click += (_, _) => HeartRequested?.Invoke();
+        _jump.Click += (_, _) => JumpRequested?.Invoke();
         _startup.Click += (_, _) => StartupToggled?.Invoke();
         _fillerPlus.Click += (_, _) => FillerDelta?.Invoke(+1);
         _fillerMinus.Click += (_, _) => FillerDelta?.Invoke(-1);
@@ -93,6 +96,7 @@ internal sealed class TrayIconHost : IDisposable
     public event Action<string>? VariantSelected;
     public event Action? MuteToggled;
     public event Action? HeartRequested;
+    public event Action? JumpRequested;
     public event Action? MultiplayerToggled;
     public event Action? StartupToggled;
     public event Action? FocusModeToggled;
@@ -125,6 +129,7 @@ internal sealed class TrayIconHost : IDisposable
         // In focus mode only Quit and the focus toggle are registered, so the other labels drop their combination.
         _mute.Text = WithHotkey("Mute bubbles", config.FocusMode ? "" : h.Mute);
         _heart.Text = WithHotkey("Send a heart", config.FocusMode ? "" : h.Heart);
+        _jump.Text = WithHotkey("Jump", config.FocusMode ? "" : h.Jump);
         _focus.Text = WithHotkey("Focus mode (no hotkeys)", h.FocusMode);
         _quit.Text = WithHotkey("Quit", h.Kill);
         _startup.Checked = config.StartWithWindows;

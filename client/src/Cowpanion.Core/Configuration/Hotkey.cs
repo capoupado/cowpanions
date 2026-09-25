@@ -219,6 +219,7 @@ public sealed class HotkeyBindings
     public const string DefaultMute = "Ctrl+Alt+M";
     public const string DefaultHeart = "Ctrl+Alt+H";
     public const string DefaultFocusMode = "Ctrl+Alt+F";
+    public const string DefaultJump = "Ctrl+Alt+J";
 
     /// <summary>Quit immediately. Can be rebound, never unbound.</summary>
     public string Kill { get; set; } = DefaultKill;
@@ -226,12 +227,15 @@ public sealed class HotkeyBindings
     public string Mute { get; set; } = DefaultMute;
     public string Heart { get; set; } = DefaultHeart;
     public string FocusMode { get; set; } = DefaultFocusMode;
+    /// <summary>Our cow jumps (a "jump" emote on every screen when connected, local only when offline).</summary>
+    public string Jump { get; set; } = DefaultJump;
 
     public HotkeyBindings Clone() => (HotkeyBindings)MemberwiseClone();
 
     public bool SameAs(HotkeyBindings other)
     {
         ArgumentNullException.ThrowIfNull(other);
-        return Kill == other.Kill && Chat == other.Chat && Mute == other.Mute && Heart == other.Heart && FocusMode == other.FocusMode;
+        return Kill == other.Kill && Chat == other.Chat && Mute == other.Mute && Heart == other.Heart && FocusMode == other.FocusMode
+            && Jump == other.Jump;
     }
 }

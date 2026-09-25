@@ -186,6 +186,13 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   deep clone). **manual: to verify** — Settings → Hotkeys, rebind Chat to `Ctrl+Shift+F10`, Apply, press it from
   another app: chat arms; the old Ctrl+Alt+C does nothing. Bind Quit to something another app owns: the row says "in
   use… using Ctrl+Alt+Shift+K instead" and Ctrl+Alt+Shift+K still quits.
+- [ ] **Jump hotkey (v1.1.0)** — `hotkeys.jump`, default `Ctrl+Alt+J`, rebindable/unbindable, released in focus
+  mode, tray "Jump". Connected: sends the v2 `jump` emote (`Orchestrator.SendJump`); the echo makes our cow hop on
+  every screen. Offline: our own cow jumps locally. A pre-1.1 config already using Ctrl+Alt+J keeps it; jump is
+  unbound with a warning. **automated: pass** — `HotkeyTests` (default for an old config, clash never steals, rebind,
+  unbind). **manual: to verify** — installed 1.0/0.2 build updates to 1.1.0 by itself (tray → Check for updates →
+  Restart to update; Settings shows "Version 1.1.0"); then press Ctrl+Alt+J from another app: your cow hops on your
+  screen and a friend's; rebind it in Settings and the new combination works.
 - [ ] **Capture box pauses hotkeys** — while a capture box has keyboard focus every hotkey, Quit included, is
   unregistered (log `hotkeys paused for capture` / `hotkeys resumed`); closing the window always resumes.
   **manual: to verify** — focus the Quit box, press Ctrl+Alt+Shift+K: the box shows it and the app does not quit;
