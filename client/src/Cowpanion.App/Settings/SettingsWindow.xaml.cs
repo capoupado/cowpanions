@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using Cowpanion.Core.Configuration;
+using Cowpanion.Core.Sprites;
 
 namespace Cowpanion.App.Settings;
 
@@ -27,7 +28,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
 
         var config = host.CurrentConfig;
-        foreach (string v in variants)
+        foreach (string v in VariantGroups.ForChooser(variants))
         {
             VariantBox.Items.Add(v);
         }

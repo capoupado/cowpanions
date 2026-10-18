@@ -132,7 +132,7 @@ public class ConfigTests : IDisposable
     [Fact]
     public void Variant_derivation_is_deterministic_and_within_the_list()
     {
-        var variants = new[] { "black0", "black1", "brown", "pug_apricot", "pug_black", "pug_fawn", "pug_silver", "white0", "white1", "white_darkspots", "white_pinkspots" };
+        var variants = new[] { "black0", "black1", "brown", "kitty_black", "kitty_grey", "kitty_orange", "kitty_white", "pug_apricot", "pug_black", "pug_fawn", "pug_silver", "white0", "white1", "white_darkspots", "white_pinkspots" };
         string id = ConfigValidator.NewClientId();
         string v1 = ConfigValidator.DeriveVariant(id, variants);
         string v2 = ConfigValidator.DeriveVariant(id, variants);

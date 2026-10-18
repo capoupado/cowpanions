@@ -17,8 +17,9 @@ src/Cowpanion.App/               WPF overlay, tray, interop (AssemblyName: Cowpa
 spike/Cowpanion.Spike/           P0 feasibility spike: transparent strip + sliding rectangle + CPU sampler
 tests/Cowpanion.Core.Tests/      xUnit, headless
 tests/Cowpanion.Net.Tests/       xUnit, loopback HttpListener WebSocket server + manual clock
-assets/sprites/cow/              seven cow sheets + four pug sheets + manifest.json (linked into the App output)
+assets/sprites/cow/              seven cow sheets + four kitty sheets + four pug sheets + manifest.json (linked into the App output)
 tools/Normalize-PugSheet.ps1     draws the pug sheets (cow layout) from pixel maps; re-run to tweak them
+tools/Normalize-KittySheet.ps1   builds the kitty sheets (cow layout) by re-gridding and recolouring assets/kitty/kitty_1.png
 ```
 
 ## Build, test, run
@@ -87,16 +88,18 @@ A small diagnostic log lives next to it in `cowpanion.log` (never contains chat 
 | `clientId` | `""` | generated once from a CSPRNG (32 hex chars); never derived from anything identifying |
 | `bubblesEnabled` / `bubblesMuted` | `true` / `false` | mute is toggled by the mute hotkey and persists |
 | `offlineHerdSize` | `4` | filler cows when multiplayer is off or unreachable (0–12) |
-| `variant` | `""` | cow colour or pug; empty = derived from `clientId` once and saved. Tray → Cow or pug |
+| `variant` | `""` | cow colour, kitty or pug; empty = derived from `clientId` once and saved. Tray → Cow, kitty or pug |
 | `hotkeys` | see below | `kill`, `chat`, `mute`, `heart`, `jump`, `focusMode`, each a combination like `"Ctrl+Alt+C"`; `""` unbinds (not allowed for `kill`) |
 | `focusMode` | `false` | release every hotkey except `kill` and `focusMode`; persists until turned off |
 | `autoCheckForUpdates` | `true` | installed builds: check the update feed 45 s after start and every 24 h |
 
 Everything except `clientId` is also editable in **Settings…** (tray menu, or double-click the tray icon).
 
-Variants: cows `black0`, `black1`, `brown`, `white0`, `white1`, `white_darkspots`, `white_pinkspots`; pugs `pug_apricot`,
-`pug_black`, `pug_fawn`, `pug_silver`. All share one 128×256 sheet layout (`docs/DECISIONS.md`). A friend on a build
-older than the pugs sees a `pug_*` member as a brown cow (unknown variant → default), by the protocol's rule.
+Variants: cows `black0`, `black1`, `brown`, `white0`, `white1`, `white_darkspots`, `white_pinkspots`; kitties
+`kitty_black`, `kitty_grey`, `kitty_orange`, `kitty_white`; pugs `pug_apricot`, `pug_black`, `pug_fawn`, `pug_silver`.
+All share one 128×256 sheet layout (`docs/DECISIONS.md`). A friend on a build older than the kitties (or the pugs) sees
+a `kitty_*` (or `pug_*`) member as a brown cow (unknown variant → default), by the protocol's rule. Kitties by bimlab,
+[Just a Kitty](https://bimlab.itch.io/just-a-kitty), recoloured; see `assets/kitty/SOURCE.md`.
 
 ## Hotkeys
 
@@ -119,8 +122,8 @@ the log; if the quit combination is taken the app falls back to `Ctrl+Alt+Shift+
 
 ## Tray menu
 
-Status line · Multiplayer on/off · Mute bubbles · Send a heart · Jump · Chat history… · Focus mode · Cow or pug ▸
-(eleven variants, cows then pugs) · Filler herd + / − · Start with Windows · Settings… · Check for updates (shows the version) ·
+Status line · Multiplayer on/off · Mute bubbles · Send a heart · Jump · Chat history… · Focus mode · Cow, kitty or pug ▸
+(fifteen variants, cows, kitties, then pugs) · Filler herd + / − · Start with Windows · Settings… · Check for updates (shows the version) ·
 Restart to update (only when one is downloaded) · Open config.json · Reload config.json · Quit.
 Labels show the current hotkey. Double-clicking the icon opens Settings.
 

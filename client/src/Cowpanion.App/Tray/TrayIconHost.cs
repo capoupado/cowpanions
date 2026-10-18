@@ -2,6 +2,7 @@ using System.Drawing;
 using System.Globalization;
 using Cowpanion.App.Interop;
 using Cowpanion.Core.Configuration;
+using Cowpanion.Core.Sprites;
 using WinForms = System.Windows.Forms;
 
 namespace Cowpanion.App.Tray;
@@ -23,7 +24,7 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _checkUpdates = new("Check for updates");
     private readonly WinForms.ToolStripMenuItem _restartToUpdate = new("Restart to update") { Visible = false };
     private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
-    private readonly WinForms.ToolStripMenuItem _colour = new("Cow or pug");
+    private readonly WinForms.ToolStripMenuItem _colour = new("Cow, kitty or pug");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
     private readonly WinForms.ToolStripMenuItem _fillerMinus = new("Filler herd −");
     private readonly Icon _drawnIcon;
@@ -56,15 +57,16 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
         _menu.Items.Add(_quit);
 
-        bool separatorAdded = false;
-        foreach (var v in variants)
+        string? previousSpecies = null;
+        foreach (var v in VariantGroups.ForChooser(variants))
         {
-            // Cows first, then a separator, then the pugs: two groups in one chooser (variants sort ordinally).
-            if (!separatorAdded && v.StartsWith("pug_", StringComparison.Ordinal) && _colour.DropDownItems.Count > 0)
+            // Cows, kitties, then pugs, with a separator between species.
+            string species = VariantGroups.Species(v);
+            if (previousSpecies is not null && species != previousSpecies)
             {
                 _colour.DropDownItems.Add(new WinForms.ToolStripSeparator());
-                separatorAdded = true;
             }
+            previousSpecies = species;
             var item = new WinForms.ToolStripMenuItem(v) { Tag = v };
             item.Click += (_, _) => VariantSelected?.Invoke(v);
             _colour.DropDownItems.Add(item);

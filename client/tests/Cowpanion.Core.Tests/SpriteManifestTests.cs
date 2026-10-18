@@ -85,7 +85,9 @@ public class SpriteManifestTests
         var m = SpriteManifest.Load(path);
         int pugs = m.VariantNames.Count(v => v.StartsWith("pug_", StringComparison.Ordinal));
         Assert.True(pugs >= 1, "expected at least one pug_ variant");
-        Assert.Equal(7 + pugs, m.Sheets.Count);
+        int kitties = m.VariantNames.Count(v => v.StartsWith("kitty_", StringComparison.Ordinal));
+        Assert.True(kitties >= 1, "expected at least one kitty_ variant");
+        Assert.Equal(7 + pugs + kitties, m.Sheets.Count);
         foreach (var name in new[] { "idle", "graze", "idle2", "moo", "walk", "lie", "sleep" })
         {
             Assert.True(m.Animations.ContainsKey(name), $"manifest lacks {name}");

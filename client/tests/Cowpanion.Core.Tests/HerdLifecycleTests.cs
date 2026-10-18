@@ -100,7 +100,7 @@ public class HerdLifecycleTests
     [Fact]
     public void Filler_colours_are_varied_and_stable_across_launches()
     {
-        string[] names = { "black0", "black1", "brown", "pug_apricot", "pug_black", "pug_fawn", "pug_silver", "white0", "white1", "white_darkspots", "white_pinkspots" };
+        string[] names = { "black0", "black1", "brown", "kitty_black", "kitty_grey", "kitty_orange", "kitty_white", "pug_apricot", "pug_black", "pug_fawn", "pug_silver", "white0", "white1", "white_darkspots", "white_pinkspots" };
         var a = NewSim(3);
         a.SetFillerVariants(names);
         a.SetFillerCount(6);

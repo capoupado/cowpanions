@@ -254,6 +254,19 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
   cows, walks head first in the direction of travel, barks with its mouth open on `/moo`, and lies still (one
   frame) for lie/sleep. A friend on an older build sees your pug as a brown cow.
 
+## Eighth round — kitties as variants (ticket #1)
+
+- [ ] **Kitty sheets fit the cow grid** — the four `kitty_*` sheets are 128×256, every variant name passes the
+  protocol rule and the real manifest parses with 7 cows + pugs + kitties. **automated: pass**
+  (`SpriteManifestTests.Every_sheet_in_repo_covers_every_row_animation`, `Every_variant_name_is_a_valid_protocol_variant`,
+  `Real_manifest_in_repo_parses_and_covers_all_states`).
+- [ ] **Chooser grouping** — cows (including `white*`), then kitties, then pugs, each in ordinal order, nothing lost or
+  duplicated. **automated: pass** (`VariantGroupsTests`; Core is now 89 tests).
+- [ ] **Kitties on screen** — **manual: to verify**: tray → Cow, kitty or pug → `kitty_orange` (separators divide cows,
+  kitties and pugs; Settings → General shows the same list in the same order). At scale 3 the kitty stands with its
+  feet on the same ground line as the cows, faces the direction it walks, plays the standing frames on `/moo`, and
+  shows the still front-view frame for lie/sleep. A friend on an older build sees your kitty as a brown cow.
+
 ---
 
 ## How I launched things (for reproducibility)

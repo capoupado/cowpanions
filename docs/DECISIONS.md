@@ -304,3 +304,24 @@ client plan's "no auto-update" hard rule and "auto-update" in its permanently-ou
   had no web access, so the plan's fallback applied; nothing to attribute). Source note, licence and frame mapping
   in `assets/pug/SOURCE.md`. Downloaded sheets can replace them later by re-running the script, data only.
 - A pug is ~24×18 px in the 32×32 frame, so at scale 3 it is a small dog next to the cows. Deliberate.
+
+## 2026-10-18 — Kitties as variants (ticket #1)
+
+- **Kitties live in the `cow` sprite pack as `kitty_*` variants** (`kitty_black`, `kitty_grey`, `kitty_orange`,
+  `kitty_white`), exactly like the pugs: 128×256 sheets in the cow layout, not a separate pack. No renderer,
+  simulator, config, server or protocol change; friends see your kitty, and a build older than this one shows a
+  `kitty_*` member as the default brown cow (existing unknown-variant rule), so no protocol version bump.
+- **Art**: built from the owner-supplied sheet `assets/kitty/kitty_1.png` ("Just a Kitty" by bimlab,
+  https://bimlab.itch.io/just-a-kitty) by `client/tools/Normalize-KittySheet.ps1`: re-gridded into the cow layout and
+  recoloured once per variant (the four colours are palette swaps of the one sheet). The source has only walk cycles
+  (front, side, back), so idle, graze, idle2 and moo reuse the standing side-view frames and lie/sleep shows the
+  front view. Mapping and palette roles in `assets/kitty/SOURCE.md`.
+- **Attribution is required**: the credit "kitties by bimlab (Just a Kitty)" with the link is on the site footer and in
+  the READMEs. The owner must confirm the itch page's terms allow redistribution in this public repo and installer.
+- **Chooser order is cows | kitties | pugs** (tray and Settings; separators between species in the tray), via
+  `VariantGroups.ForChooser`. This also fixes the white cows that used to sort after the pugs, under the pug
+  separator. `SpriteManifest.VariantNames` stays ordinal.
+- **Fillers and first-run derivation** now hash over 15 variants, so filler colours reshuffle once and a filler or a
+  new user may be a kitty, as accepted for the pugs. Variants users already chose are kept in config.
+- A kitty is ~18×14 px in the 32×32 frame (k = 1, no scaling), smaller than a pug, so at scale 3 it is a small cat
+  next to the cows. Deliberate.
