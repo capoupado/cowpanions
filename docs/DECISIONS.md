@@ -283,3 +283,24 @@ client plan's "no auto-update" hard rule and "auto-update" in its permanently-ou
   separation eases the two apart at the usual capped push speed.
 - `HerdSettings.LaneDepthDips` / `LaneChangeDipsPerSecond` and `Cow.Lane` removed. Hover picks the
   resting cow when a walker overlaps it (it is the one drawn in front).
+
+## 2026-10-18 — Pugs as variants (ticket M-2)
+
+- **Pugs live in the `cow` sprite pack as `pug_*` variants** (`pug_apricot`, `pug_black`, `pug_fawn`, `pug_silver`),
+  each a 128×256 sheet in the exact cow layout (rows 0 idle, 1 graze, 2 idle2, 3 moo = bark, 4 walk, 5 lie/sleep
+  frame 0; rows 6–7 empty, art faces right, feet on the frame's bottom row). One chooser ("Cow or pug", tray and
+  Settings; a separator splits cows from pugs), one protocol token, no renderer, simulator, config or protocol
+  change. Friends see your pug; on a build older than this one a `pug_*` member renders as the default brown cow
+  (the existing unknown-variant rule), so no protocol version bump.
+- **Supersedes** the client plan's permanent exclusion "more than one species per sprite pack"
+  (`docs/cowpanion-client-plan.md`, "Out of scope"): the owner asked for pugs as choices.
+- **Rejected alternative: a separate `pug` sprite pack** picked through the existing "Sprite pack" setting. That
+  is per screen, not per member: everyone on your display would become a pug and friends would not see your
+  choice, so it does not give "choices".
+- **Fillers and first-run derivation** hash over the full variant list, so a filler or a brand-new user may be a
+  pug. Intended. If cow-only fillers are preferred later, pass a filtered list to `SetFillerVariants` in the
+  Orchestrator (one line, follow-up).
+- **Art**: original pixel art drawn by `client/tools/Normalize-PugSheet.ps1` from pixel maps (the implementation
+  had no web access, so the plan's fallback applied; nothing to attribute). Source note, licence and frame mapping
+  in `assets/pug/SOURCE.md`. Downloaded sheets can replace them later by re-running the script, data only.
+- A pug is ~24×18 px in the 32×32 frame, so at scale 3 it is a small dog next to the cows. Deliberate.

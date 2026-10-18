@@ -83,7 +83,9 @@ public class SpriteManifestTests
     {
         string path = FindRepoManifest();
         var m = SpriteManifest.Load(path);
-        Assert.Equal(7, m.Sheets.Count);
+        int pugs = m.VariantNames.Count(v => v.StartsWith("pug_", StringComparison.Ordinal));
+        Assert.True(pugs >= 1, "expected at least one pug_ variant");
+        Assert.Equal(7 + pugs, m.Sheets.Count);
         foreach (var name in new[] { "idle", "graze", "idle2", "moo", "walk", "lie", "sleep" })
         {
             Assert.True(m.Animations.ContainsKey(name), $"manifest lacks {name}");
@@ -92,6 +94,48 @@ public class SpriteManifestTests
         {
             Assert.True(File.Exists(Path.Combine(m.BaseDirectory, file)), $"sheet {file} missing");
         }
+    }
+
+    [Fact]
+    public void Every_sheet_in_repo_covers_every_row_animation()
+    {
+        // SpriteLibrary slices every variant x animation at startup and throws for a frame outside the sheet,
+        // so a short sheet is a fatal crash for everyone who updates. Check the PNG header of each sheet.
+        var m = SpriteManifest.Load(FindRepoManifest());
+        var rowAnimations = m.Animations.Values.Where(a => !a.UsesFiles).ToList();
+        Assert.NotEmpty(rowAnimations);
+        int minWidth = m.FrameWidth * rowAnimations.Max(a => a.Frames);
+        int minHeight = m.FrameHeight * (rowAnimations.Max(a => a.Row) + 1);
+        foreach (var (variant, file) in m.Sheets)
+        {
+            var (width, height) = ReadPngSize(Path.Combine(m.BaseDirectory, file));
+            Assert.True(width >= minWidth, $"{file} ({variant}) is {width} px wide, animations need {minWidth}");
+            Assert.True(height >= minHeight, $"{file} ({variant}) is {height} px tall, animations need {minHeight}");
+        }
+    }
+
+    [Fact]
+    public void Every_variant_name_is_a_valid_protocol_variant()
+    {
+        var m = SpriteManifest.Load(FindRepoManifest());
+        foreach (var name in m.VariantNames)
+        {
+            Assert.True(Cowpanion.Core.Configuration.ConfigValidator.IsValidVariant(name), $"variant {name} does not match the protocol rule");
+        }
+    }
+
+    private static (int Width, int Height) ReadPngSize(string path)
+    {
+        byte[] header = new byte[24];
+        using (var fs = File.OpenRead(path))
+        {
+            Assert.Equal(header.Length, fs.Read(header, 0, header.Length));
+        }
+        ReadOnlySpan<byte> signature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        Assert.True(header.AsSpan(0, 8).SequenceEqual(signature), $"{path} is not a PNG");
+        int width = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(16, 4));
+        int height = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(20, 4));
+        return (width, height);
     }
 
     private static string FindRepoManifest()

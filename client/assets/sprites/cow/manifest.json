@@ -13,7 +13,11 @@
     "white0": "cows_spritesheet_white0.png",
     "white1": "cows_spritesheet_white1.png",
     "white_darkspots": "cows_spritesheet_white_darkspots.png",
-    "white_pinkspots": "cows_spritesheet_white_pinkspots.png"
+    "white_pinkspots": "cows_spritesheet_white_pinkspots.png",
+    "pug_apricot": "pugs_spritesheet_apricot.png",
+    "pug_black": "pugs_spritesheet_black.png",
+    "pug_fawn": "pugs_spritesheet_fawn.png",
+    "pug_silver": "pugs_spritesheet_silver.png"
   },
   "animations": {
     "idle":  { "row": 0, "frames": 3, "fps": 3, "loop": true },

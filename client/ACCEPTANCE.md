@@ -244,6 +244,16 @@ Decisions in `docs/DECISIONS.md` "Fourth round". Everything below was built agai
 - [ ] **Dev / old-zip builds** — tray shows "Updates need the installed version (vX)" disabled; no update request is
   made. **observed** by code review (`UpdateService` stage NotInstalled when `UpdateManager.IsInstalled` is false).
 
+## Seventh round — pugs as variants (ticket M-2)
+
+- [ ] **Pug sheets fit the cow grid** — every sheet is at least 128×192 for the row animations and every variant name
+  passes the protocol rule. **automated: pass** (`SpriteManifestTests.Every_sheet_in_repo_covers_every_row_animation`,
+  `Every_variant_name_is_a_valid_protocol_variant`, `Real_manifest_in_repo_parses_and_covers_all_states`).
+- [ ] **Pugs on screen** — **manual: to verify**: tray → Cow or pug → `pug_fawn` (a separator divides cows from pugs;
+  Settings → General shows the same list). At scale 3 the pug stands with its feet on the same ground line as the
+  cows, walks head first in the direction of travel, barks with its mouth open on `/moo`, and lies still (one
+  frame) for lie/sleep. A friend on an older build sees your pug as a brown cow.
+
 ---
 
 ## How I launched things (for reproducibility)

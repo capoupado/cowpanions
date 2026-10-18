@@ -23,7 +23,7 @@ internal sealed class TrayIconHost : IDisposable
     private readonly WinForms.ToolStripMenuItem _checkUpdates = new("Check for updates");
     private readonly WinForms.ToolStripMenuItem _restartToUpdate = new("Restart to update") { Visible = false };
     private readonly WinForms.ToolStripMenuItem _startup = new("Start with Windows");
-    private readonly WinForms.ToolStripMenuItem _colour = new("Cow colour");
+    private readonly WinForms.ToolStripMenuItem _colour = new("Cow or pug");
     private readonly WinForms.ToolStripMenuItem _fillerPlus = new("Filler herd +");
     private readonly WinForms.ToolStripMenuItem _fillerMinus = new("Filler herd −");
     private readonly Icon _drawnIcon;
@@ -56,8 +56,15 @@ internal sealed class TrayIconHost : IDisposable
         _menu.Items.Add(new WinForms.ToolStripSeparator());
         _menu.Items.Add(_quit);
 
+        bool separatorAdded = false;
         foreach (var v in variants)
         {
+            // Cows first, then a separator, then the pugs: two groups in one chooser (variants sort ordinally).
+            if (!separatorAdded && v.StartsWith("pug_", StringComparison.Ordinal) && _colour.DropDownItems.Count > 0)
+            {
+                _colour.DropDownItems.Add(new WinForms.ToolStripSeparator());
+                separatorAdded = true;
+            }
             var item = new WinForms.ToolStripMenuItem(v) { Tag = v };
             item.Click += (_, _) => VariantSelected?.Invoke(v);
             _colour.DropDownItems.Add(item);

@@ -18,7 +18,7 @@ No accounts, no message history, no telemetry. Windows 10/11 only.
 | `server/deploy/` | Everything to run it on a Debian VPS: idempotent `install.sh`, systemd unit, nginx site, logrotate, and a step-by-step `RUNBOOK.md`. |
 | `site/` | The static announcement page. |
 | `docs/` | The wire protocol, the two build plans, the decision log, and the acceptance checklists. |
-| `assets/` | The seven cow sprite sheets. |
+| `assets/` | The seven cow sprite sheets, and `assets/pug/` with the pug sheets and their source note. |
 
 ## Quick start
 
